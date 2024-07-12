@@ -1,0 +1,9 @@
+5 REM Hello, World! in BASIC
+10 LET N=10
+20 FOR I=1 TO N
+30 PRINT "Hello, World!"
+100 END
+40 IF I=5 THEN PRINT "Halfway there!"
+50 ELSEIF I=10 THEN PRINT "Done!"
+60 END IF
+70 NEXT I
