@@ -1,11 +1,11 @@
 use super::lexer::{Lexer, Tok};
 
 #[derive(Debug, Clone)]
-pub struct Program {
+pub struct ParsedLines {
     lines: Vec<Line>,
 }
 
-impl IntoIterator for Program {
+impl IntoIterator for ParsedLines {
     type Item = Line;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -14,7 +14,7 @@ impl IntoIterator for Program {
     }
 }
 
-impl std::fmt::Display for Program {
+impl std::fmt::Display for ParsedLines {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for line in &self.lines {
             writeln!(f, "{}", line)?;
@@ -27,7 +27,7 @@ impl std::fmt::Display for Program {
 #[derive(Debug, Clone)]
 pub struct Line {
     line_number: u64,
-    stmt: Stmt,
+    stmt: LineStmt,
 }
 
 impl std::fmt::Display for Line {
@@ -37,7 +37,7 @@ impl std::fmt::Display for Line {
 }
 
 #[derive(Debug, Clone)]
-pub enum Stmt {
+pub enum LineStmt {
     Let {
         var: String,
         ex: Box<Expr>,
@@ -58,13 +58,20 @@ pub enum Stmt {
     Rem {
         comment: String,
     },
+    Goto {
+        line_number: u64,
+    },
+    Gosub {
+        line_number: u64,
+    },
+    Return,
 }
 
-impl std::fmt::Display for Stmt {
+impl std::fmt::Display for LineStmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Stmt::Let { var, ex } => write!(f, "LET {} = {}", var, ex),
-            Stmt::For {
+            LineStmt::Let { var, ex } => write!(f, "LET {} = {}", var, ex),
+            LineStmt::For {
                 var,
                 start,
                 cond,
@@ -72,10 +79,13 @@ impl std::fmt::Display for Stmt {
             } => {
                 write!(f, "FOR {} = {} TO {} STEP {}", var, start, cond, step)
             }
-            Stmt::Next { var } => write!(f, "NEXT {}", var),
-            Stmt::Print { ex } => write!(f, "PRINT {}", ex),
-            Stmt::End => write!(f, "END"),
-            Stmt::Rem { comment } => write!(f, "REM {}", comment),
+            LineStmt::Next { var } => write!(f, "NEXT {}", var),
+            LineStmt::Print { ex } => write!(f, "PRINT {}", ex),
+            LineStmt::End => write!(f, "END"),
+            LineStmt::Rem { comment } => write!(f, "REM {}", comment),
+            LineStmt::Goto { line_number } => write!(f, "GOTO {}", line_number),
+            LineStmt::Gosub { line_number } => write!(f, "GOSUB {}", line_number),
+            LineStmt::Return => write!(f, "RETURN"),
         }
     }
 }
@@ -83,8 +93,8 @@ impl std::fmt::Display for Stmt {
 #[derive(Debug, Clone)]
 pub enum Expr {
     BinOp {
-        lhs: Box<Expr>,
         op: Tok,
+        lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
     Num(u64),
@@ -126,7 +136,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Program {
+    pub fn parse(&mut self) -> ParsedLines {
         self.prgrm()
     }
 
@@ -212,17 +222,17 @@ impl Parser {
             _ => panic!("Expected line number, found: {:?}", self.current_token),
         };
 
-        let stmt = self.stmt();
+        let stmt = self.line_stmt();
 
         Line { line_number, stmt }
     }
 
-    // Statement parsing functions
-    fn let_stmt(&mut self) -> Stmt {
+    // Line statement parsing functions
+    fn let_stmt(&mut self) -> LineStmt {
         if let Tok::Identifier(var) = self.current_token.clone() {
             self.advance();
             self.eat(Tok::Assign);
-            Stmt::Let {
+            LineStmt::Let {
                 var,
                 ex: Box::new(self.expr()),
             }
@@ -231,7 +241,7 @@ impl Parser {
         }
     }
 
-    fn for_stmt(&mut self) -> Stmt {
+    fn for_stmt(&mut self) -> LineStmt {
         if let Tok::Identifier(var) = self.current_token.clone() {
             self.advance();
             self.eat(Tok::Assign);
@@ -248,7 +258,7 @@ impl Parser {
                 Expr::Num(1)
             };
 
-            Stmt::For {
+            LineStmt::For {
                 var,
                 start: Box::new(start),
                 cond: Box::new(cond),
@@ -259,16 +269,34 @@ impl Parser {
         }
     }
 
-    fn next_stmt(&mut self) -> Stmt {
+    fn next_stmt(&mut self) -> LineStmt {
         if let Tok::Identifier(var) = self.current_token.clone() {
             self.advance();
-            Stmt::Next { var }
+            LineStmt::Next { var }
         } else {
             panic!("Expected identifier, found: {:?}", self.current_token);
         }
     }
 
-    fn stmt(&mut self) -> Stmt {
+    fn goto_stmt(&mut self) -> LineStmt {
+        if let Tok::Number(line_number) = self.current_token.clone() {
+            self.advance();
+            LineStmt::Goto { line_number }
+        } else {
+            panic!("Expected line number, found: {:?}", self.current_token);
+        }
+    }
+
+    fn gosub_stmt(&mut self) -> LineStmt {
+        if let Tok::Number(line_number) = self.current_token.clone() {
+            self.advance();
+            LineStmt::Gosub { line_number }
+        } else {
+            panic!("Expected line number, found: {:?}", self.current_token);
+        }
+    }
+
+    fn line_stmt(&mut self) -> LineStmt {
         match self.current_token {
             Tok::Let => {
                 self.advance();
@@ -284,13 +312,13 @@ impl Parser {
             }
             Tok::Print => {
                 self.advance();
-                Stmt::Print {
+                LineStmt::Print {
                     ex: Box::new(self.expr()),
                 }
             }
             Tok::End => {
                 self.advance();
-                Stmt::End
+                LineStmt::End
             }
             Tok::Rem(_) => {
                 let comment = match self.current_token.clone() {
@@ -298,8 +326,21 @@ impl Parser {
                     _ => panic!("Expected REM comment, found: {:?}", self.current_token),
                 };
                 self.advance();
-                Stmt::Rem { comment }
+                LineStmt::Rem { comment }
             }
+            Tok::Goto => {
+                self.advance();
+                self.goto_stmt()
+            }
+            Tok::Gosub => {
+                self.advance();
+                self.gosub_stmt()
+            }
+            Tok::Return => {
+                self.advance();
+                LineStmt::Return
+            }
+
             _ => panic!(
                 "Expected statement keyword:\nLET, FOR, PRINT...\nfound: {:?}",
                 self.current_token
@@ -307,7 +348,7 @@ impl Parser {
         }
     }
 
-    fn prgrm(&mut self) -> Program {
+    fn prgrm(&mut self) -> ParsedLines {
         let mut lines = vec![];
 
         while self.current_token != Tok::Eof {
@@ -318,6 +359,6 @@ impl Parser {
         // sort by line numbers
         lines.sort_by(|a, b| a.line_number.cmp(&b.line_number));
 
-        Program { lines }
+        ParsedLines { lines }
     }
 }

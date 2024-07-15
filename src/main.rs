@@ -1,8 +1,8 @@
 mod lexer;
-mod parser;
+mod line_parser;
 
 use lexer::Lexer;
-use parser::Parser;
+use line_parser::Parser;
 
 fn main() {
     let mut args = std::env::args();

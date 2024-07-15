@@ -8,6 +8,9 @@ pub enum Tok {
     Next,
     Print,
     End,
+    Goto,
+    Gosub,
+    Return,
     // comments
     Rem(String),
     // Identifiers
@@ -38,6 +41,9 @@ impl std::fmt::Display for Tok {
             Tok::Next => write!(f, "NEXT"),
             Tok::Print => write!(f, "PRINT"),
             Tok::End => write!(f, "END"),
+            Tok::Goto => write!(f, "GOTO"),
+            Tok::Gosub => write!(f, "GOSUB"),
+            Tok::Return => write!(f, "RETURN"),
             Tok::Rem(comment) => write!(f, "REM {}", comment),
             Tok::Identifier(id) => write!(f, "{}", id),
             Tok::Number(num) => write!(f, "{}", num),
@@ -135,8 +141,21 @@ impl Lexer {
         Tok::StringLiteral(str_lit)
     }
 
+    fn rem(&mut self) -> Tok {
+        let mut comment = String::new();
+        while let Some(ch) = self.current_char {
+            if ch == '\n' {
+                break;
+            }
+            comment.push(ch);
+            self.advance();
+        }
+        Tok::Rem(comment)
+    }
+
     fn identifier(&mut self) -> Tok {
         let mut id_str = String::new();
+
         while let Some(ch) = self.current_char {
             if ch.is_alphanumeric() {
                 id_str.push(ch);
@@ -145,6 +164,7 @@ impl Lexer {
                 break;
             }
         }
+
         match id_str.as_str() {
             "LET" => Tok::Let,
             "FOR" => Tok::For,
@@ -153,17 +173,13 @@ impl Lexer {
             "NEXT" => Tok::Next,
             "PRINT" => Tok::Print,
             "END" => Tok::End,
+            "GOTO" => Tok::Goto,
+            "GOSUB" => Tok::Gosub,
+            "RETURN" => Tok::Return,
+            // Special case for REM (comments)
             "REM" => {
                 self.skip_whitespace();
-                let mut comment = String::new();
-                while let Some(ch) = self.current_char {
-                    if ch == '\n' {
-                        break;
-                    }
-                    comment.push(ch);
-                    self.advance();
-                }
-                Tok::Rem(comment)
+                self.rem()
             }
             _ => Tok::Identifier(id_str),
         }
