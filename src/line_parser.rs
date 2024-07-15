@@ -66,13 +66,18 @@ impl std::fmt::Display for Line {
 pub enum LineStmt {
     Let {
         var: String,
-        ex: Box<Expr>,
+        ex: Box<Aexpr>,
     },
     For {
         var: String,
-        start: Box<Expr>,
-        cond: Box<Expr>,
-        step: Box<Expr>,
+        start: Box<Aexpr>,
+        cond: Box<Aexpr>,
+        step: Box<Aexpr>,
+    },
+    If {
+        cond: Box<Bexpr>,
+        then: Box<LineStmt>,
+        else_: Option<Box<LineStmt>>,
     },
     Next {
         var: String,
@@ -82,7 +87,7 @@ pub enum LineStmt {
         var: String,
     },
     Print {
-        exs: Vec<Expr>,
+        exs: Vec<Aexpr>,
     },
     End,
     Rem {
@@ -113,6 +118,13 @@ impl std::fmt::Display for LineStmt {
             } => {
                 write!(f, "FOR {} = {} TO {} STEP {}", var, start, cond, step)
             }
+            LineStmt::If { cond, then, else_ } => {
+                write!(f, "IF {} THEN {}", cond, then)?;
+                if let Some(else_) = else_ {
+                    write!(f, " ELSE {}", else_)?;
+                }
+                Ok(())
+            }
             LineStmt::Next { var } => write!(f, "NEXT {}", var),
             LineStmt::Input { prompt, var } => {
                 if let Some(prompt) = prompt {
@@ -142,21 +154,21 @@ impl std::fmt::Display for LineStmt {
 }
 
 #[derive(Debug, Clone)]
-pub enum Expr {
-    BinOp {
+pub enum Aexpr {
+    ArithOp {
         op: Tok,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
+        lhs: Box<Aexpr>,
+        rhs: Box<Aexpr>,
     },
     Num(u64),
     StringLiteral(String),
     Var(String),
 }
 
-impl std::fmt::Display for Expr {
+impl std::fmt::Display for Aexpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::BinOp { lhs, op, rhs } => {
+            Aexpr::ArithOp { lhs, op, rhs } => {
                 let op_str = match op {
                     Tok::Plus => "+",
                     Tok::Minus => "-",
@@ -166,9 +178,48 @@ impl std::fmt::Display for Expr {
                 };
                 write!(f, "({} {} {})", lhs, op_str, rhs)
             }
-            Expr::Num(value) => write!(f, "{}", value),
-            Expr::Var(name) => write!(f, "{}", name),
-            Expr::StringLiteral(value) => write!(f, "\"{}\"", value),
+            Aexpr::Num(value) => write!(f, "{}", value),
+            Aexpr::Var(name) => write!(f, "{}", name),
+            Aexpr::StringLiteral(value) => write!(f, "\"{}\"", value),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Bexpr {
+    ArithOp {
+        op: Tok,
+        lhs: Box<Aexpr>,
+        rhs: Box<Aexpr>,
+    },
+    BoolOp {
+        op: Tok,
+        lhs: Box<Bexpr>,
+        rhs: Box<Bexpr>,
+    },
+}
+
+impl std::fmt::Display for Bexpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Bexpr::ArithOp { lhs, op, rhs } => {
+                let op_str = match op {
+                    Tok::Diamond => "<>",
+                    Tok::GreaterThan => ">",
+                    Tok::LessThan => "<",
+                    Tok::Eq => "=",
+                    _ => panic!("Unexpected token in BinOp"),
+                };
+                write!(f, "({} {} {})", lhs, op_str, rhs)
+            }
+            Bexpr::BoolOp { lhs, op, rhs } => {
+                let op_str = match op {
+                    Tok::And => "AND",
+                    Tok::Or => "OR",
+                    _ => panic!("Unexpected token in BinOp"),
+                };
+                write!(f, "({} {} {})", lhs, op_str, rhs)
+            }
         }
     }
 }
@@ -208,19 +259,19 @@ impl Parser {
     }
 
     // Expression parsing functions
-    fn factor(&mut self) -> Expr {
+    fn factor(&mut self) -> Aexpr {
         match self.current_token.clone() {
             Tok::Number(value) => {
                 self.advance();
-                Expr::Num(value)
+                Aexpr::Num(value)
             }
             Tok::StringLiteral(value) => {
                 self.advance();
-                Expr::StringLiteral(value)
+                Aexpr::StringLiteral(value)
             }
             Tok::Identifier(name) => {
                 self.advance();
-                Expr::Var(name)
+                Aexpr::Var(name)
             }
             Tok::LParen => {
                 self.advance();
@@ -235,12 +286,12 @@ impl Parser {
         }
     }
 
-    fn term(&mut self) -> Expr {
+    fn term(&mut self) -> Aexpr {
         let mut node = self.factor();
         while self.current_token == Tok::Star || self.current_token == Tok::Slash {
             let token = self.current_token.clone();
             self.advance();
-            node = Expr::BinOp {
+            node = Aexpr::ArithOp {
                 lhs: Box::new(node),
                 op: token,
                 rhs: Box::new(self.factor()),
@@ -249,18 +300,52 @@ impl Parser {
         node
     }
 
-    fn expr(&mut self) -> Expr {
+    fn expr(&mut self) -> Aexpr {
         let mut node = self.term();
         while self.current_token == Tok::Plus || self.current_token == Tok::Minus {
             let token = self.current_token.clone();
             self.advance();
-            node = Expr::BinOp {
+            node = Aexpr::ArithOp {
                 lhs: Box::new(node),
                 op: token,
                 rhs: Box::new(self.term()),
             };
         }
         node
+    }
+
+    fn bexpr(&mut self) -> Bexpr {
+        let anode = self.expr();
+        let node = if self.current_token == Tok::LessThan
+            || self.current_token == Tok::GreaterThan
+            || self.current_token == Tok::Diamond
+            || self.current_token == Tok::Eq
+        {
+            let token = self.current_token.clone();
+            self.advance();
+            Bexpr::ArithOp {
+                lhs: Box::new(anode),
+                op: token,
+                rhs: Box::new(self.expr()),
+            }
+        } else {
+            panic!(
+                "Expected relational operator, found: {:?}",
+                self.current_token
+            );
+        };
+
+        if self.current_token == Tok::And || self.current_token == Tok::Or {
+            let token = self.current_token.clone();
+            self.advance();
+            Bexpr::BoolOp {
+                lhs: Box::new(node),
+                op: token,
+                rhs: Box::new(self.bexpr()),
+            }
+        } else {
+            node
+        }
     }
 
     // Line parsing functions
@@ -285,7 +370,7 @@ impl Parser {
     fn let_stmt(&mut self) -> LineStmt {
         if let Tok::Identifier(var) = self.current_token.clone() {
             self.advance();
-            self.eat(Tok::Assign);
+            self.eat(Tok::Eq);
             LineStmt::Let {
                 var,
                 ex: Box::new(self.expr()),
@@ -298,7 +383,7 @@ impl Parser {
     fn for_stmt(&mut self) -> LineStmt {
         if let Tok::Identifier(var) = self.current_token.clone() {
             self.advance();
-            self.eat(Tok::Assign);
+            self.eat(Tok::Eq);
             let start = self.expr();
 
             self.eat(Tok::To);
@@ -309,7 +394,7 @@ impl Parser {
                 self.advance();
                 self.expr()
             } else {
-                Expr::Num(1)
+                Aexpr::Num(1)
             };
 
             LineStmt::For {
@@ -390,6 +475,23 @@ impl Parser {
         }
     }
 
+    fn if_stmt(&mut self) -> LineStmt {
+        let cond = self.bexpr();
+        self.eat(Tok::Then);
+        let then = Box::new(self.stmt());
+        let else_ = if self.current_token == Tok::Else {
+            self.advance();
+            Some(Box::new(self.stmt()))
+        } else {
+            None
+        };
+        LineStmt::If {
+            cond: Box::new(cond),
+            then,
+            else_,
+        }
+    }
+
     fn atomic_stmt(&mut self) -> LineStmt {
         match self.current_token {
             Tok::Let => {
@@ -435,6 +537,10 @@ impl Parser {
             Tok::Return => {
                 self.advance();
                 LineStmt::Return
+            }
+            Tok::If => {
+                self.advance();
+                self.if_stmt()
             }
             _ => panic!(
                 "Expected statement keyword:\nLET, FOR, PRINT...\nfound: {:?}",

@@ -6,4 +6,5 @@
 70 NEXT I
 40 GOTO 10
 50 RETURN
-60 INPUT "What is your name? "; X
+60 INPUT "What is your name? "; X$
+80 IF N = 10 THEN PRINT "N is 10" ELSE PRINT "N is not 10"

@@ -12,6 +12,9 @@ pub enum Tok {
     Goto,
     Gosub,
     Return,
+    If,
+    Then,
+    Else,
     // comments
     Rem(String),
     // Identifiers
@@ -24,11 +27,16 @@ pub enum Tok {
     Minus,
     Star,
     Slash,
-    Assign,
+    Eq,
     LParen,
     RParen,
     Colon,
     SemiColon,
+    Diamond,
+    GreaterThan,
+    LessThan,
+    And,
+    Or,
     // Misc
     Eol,
     Eof,
@@ -48,6 +56,9 @@ impl std::fmt::Display for Tok {
             Tok::Goto => write!(f, "GOTO"),
             Tok::Gosub => write!(f, "GOSUB"),
             Tok::Return => write!(f, "RETURN"),
+            Tok::If => write!(f, "IF"),
+            Tok::Then => write!(f, "THEN"),
+            Tok::Else => write!(f, "ELSE"),
             Tok::Rem(comment) => write!(f, "REM {}", comment),
             Tok::Identifier(id) => write!(f, "{}", id),
             Tok::Number(num) => write!(f, "{}", num),
@@ -56,11 +67,16 @@ impl std::fmt::Display for Tok {
             Tok::Minus => write!(f, "-"),
             Tok::Star => write!(f, "*"),
             Tok::Slash => write!(f, "/"),
-            Tok::Assign => write!(f, "="),
+            Tok::Eq => write!(f, "="),
             Tok::LParen => write!(f, "("),
             Tok::RParen => write!(f, ")"),
             Tok::Colon => write!(f, ":"),
             Tok::SemiColon => write!(f, ";"),
+            Tok::Diamond => write!(f, "<>"),
+            Tok::GreaterThan => write!(f, ">"),
+            Tok::LessThan => write!(f, "<"),
+            Tok::And => write!(f, "AND"),
+            Tok::Or => write!(f, "OR"),
             Tok::Eol => writeln!(f),
             Tok::Eof => write!(f, "EOF"),
         }
@@ -92,11 +108,21 @@ impl Lexer {
                 '-' => Tok::Minus,
                 '*' => Tok::Star,
                 '/' => Tok::Slash,
-                '=' => Tok::Assign,
+                '=' => Tok::Eq,
                 '(' => Tok::LParen,
                 ')' => Tok::RParen,
                 ':' => Tok::Colon,
                 ';' => Tok::SemiColon,
+                '<' => {
+                    self.advance();
+                    if self.current_char == Some('>') {
+                        self.advance();
+                        Tok::Diamond
+                    } else {
+                        Tok::LessThan
+                    }
+                }
+                '>' => Tok::GreaterThan,
                 '\n' => Tok::Eol,
                 '0'..='9' | '.' => return self.number(),
                 'A'..='Z' | 'a'..='z' => return self.identifier(),
@@ -165,7 +191,7 @@ impl Lexer {
         let mut id_str = String::new();
 
         while let Some(ch) = self.current_char {
-            if ch.is_alphanumeric() {
+            if ch.is_alphanumeric() || ch == '$' {
                 id_str.push(ch);
                 self.advance();
             } else {
@@ -185,6 +211,11 @@ impl Lexer {
             "GOTO" => Tok::Goto,
             "GOSUB" => Tok::Gosub,
             "RETURN" => Tok::Return,
+            "IF" => Tok::If,
+            "THEN" => Tok::Then,
+            "ELSE" => Tok::Else,
+            "AND" => Tok::And,
+            "OR" => Tok::Or,
             // Special case for REM (comments)
             "REM" => {
                 self.skip_whitespace();
