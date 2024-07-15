@@ -18,8 +18,12 @@ impl IntoIterator for ParsedLines {
 
 impl std::fmt::Display for ParsedLines {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for line in &self.lines {
+        // Don't add newline in last line
+        for line in self.lines.iter().take(self.lines.len() - 1) {
             writeln!(f, "{}", line)?;
+        }
+        if let Some(last_line) = self.lines.iter().last() {
+            write!(f, "{}", last_line)?;
         }
 
         Ok(())
@@ -108,8 +112,11 @@ impl std::fmt::Display for LineStmt {
             LineStmt::Next { var } => write!(f, "NEXT {}", var),
             LineStmt::Print { exs } => {
                 write!(f, "PRINT ")?;
-                for ex in exs {
-                    write!(f, "{}; ", ex)?;
+                for (i, ex) in exs.iter().enumerate() {
+                    write!(f, "{}", ex)?;
+                    if i < exs.len() - 1 {
+                        write!(f, "; ")?;
+                    }
                 }
                 Ok(())
             }
