@@ -77,6 +77,10 @@ pub enum LineStmt {
     Next {
         var: String,
     },
+    Input {
+        prompt: Option<String>,
+        var: String,
+    },
     Print {
         exs: Vec<Expr>,
     },
@@ -110,6 +114,13 @@ impl std::fmt::Display for LineStmt {
                 write!(f, "FOR {} = {} TO {} STEP {}", var, start, cond, step)
             }
             LineStmt::Next { var } => write!(f, "NEXT {}", var),
+            LineStmt::Input { prompt, var } => {
+                if let Some(prompt) = prompt {
+                    write!(f, "INPUT \"{}\"; {}", prompt, var)
+                } else {
+                    write!(f, "INPUT {}", var)
+                }
+            }
             LineStmt::Print { exs } => {
                 write!(f, "PRINT ")?;
                 for (i, ex) in exs.iter().enumerate() {
@@ -353,6 +364,32 @@ impl Parser {
         LineStmt::Print { exs }
     }
 
+    fn input_stmt(&mut self) -> LineStmt {
+        match self.current_token.clone() {
+            Tok::StringLiteral(prompt) => {
+                self.advance();
+                self.eat(Tok::SemiColon);
+                if let Tok::Identifier(var) = self.current_token.clone() {
+                    self.advance();
+                    LineStmt::Input {
+                        prompt: Some(prompt),
+                        var,
+                    }
+                } else {
+                    panic!("Expected identifier, found: {:?}", self.current_token);
+                }
+            }
+            Tok::Identifier(var) => {
+                self.advance();
+                LineStmt::Input { prompt: None, var }
+            }
+            _ => panic!(
+                "Expected string literal or identifier, found: {:?}",
+                self.current_token
+            ),
+        }
+    }
+
     fn atomic_stmt(&mut self) -> LineStmt {
         match self.current_token {
             Tok::Let => {
@@ -366,6 +403,10 @@ impl Parser {
             Tok::Next => {
                 self.advance();
                 self.next_stmt()
+            }
+            Tok::Input => {
+                self.advance();
+                self.input_stmt()
             }
             Tok::Print => {
                 self.advance();

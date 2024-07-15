@@ -6,3 +6,4 @@
 70 NEXT I
 40 GOTO 10
 50 RETURN
+60 INPUT "What is your name? "; X
