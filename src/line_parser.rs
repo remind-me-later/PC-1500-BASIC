@@ -87,6 +87,10 @@ pub enum LineStmt {
         line_number: u64,
     },
     Return,
+    Concat {
+        lhs: Box<LineStmt>,
+        rhs: Box<LineStmt>,
+    },
 }
 
 impl std::fmt::Display for LineStmt {
@@ -108,6 +112,7 @@ impl std::fmt::Display for LineStmt {
             LineStmt::Goto { line_number } => write!(f, "GOTO {}", line_number),
             LineStmt::Gosub { line_number } => write!(f, "GOSUB {}", line_number),
             LineStmt::Return => write!(f, "RETURN"),
+            LineStmt::Concat { lhs, rhs } => write!(f, "{}: {}", lhs, rhs),
         }
     }
 }
@@ -244,7 +249,7 @@ impl Parser {
             _ => panic!("Expected line number, found: {:?}", self.current_token),
         };
 
-        let stmt = self.line_stmt();
+        let stmt = self.stmt();
 
         Line {
             number: line_number,
@@ -321,7 +326,7 @@ impl Parser {
         }
     }
 
-    fn line_stmt(&mut self) -> LineStmt {
+    fn atomic_stmt(&mut self) -> LineStmt {
         match self.current_token {
             Tok::Let => {
                 self.advance();
@@ -365,11 +370,27 @@ impl Parser {
                 self.advance();
                 LineStmt::Return
             }
-
             _ => panic!(
                 "Expected statement keyword:\nLET, FOR, PRINT...\nfound: {:?}",
                 self.current_token
             ),
+        }
+    }
+
+    fn stmt(&mut self) -> LineStmt {
+        let lhs = self.atomic_stmt();
+
+        if self.current_token != Tok::Colon {
+            return lhs;
+        }
+
+        // TODO: check for EOL?
+
+        self.eat(Tok::Colon);
+        let rhs = self.stmt();
+        LineStmt::Concat {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
         }
     }
 
