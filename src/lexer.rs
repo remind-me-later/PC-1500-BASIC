@@ -27,7 +27,7 @@ pub enum Tok {
     LParen,
     RParen,
     Colon,
-    Semicolon,
+    SemiColon,
     // Misc
     Eol,
     Eof,
@@ -58,7 +58,7 @@ impl std::fmt::Display for Tok {
             Tok::LParen => write!(f, "("),
             Tok::RParen => write!(f, ")"),
             Tok::Colon => write!(f, ":"),
-            Tok::Semicolon => write!(f, ";"),
+            Tok::SemiColon => write!(f, ";"),
             Tok::Eol => writeln!(f),
             Tok::Eof => write!(f, "EOF"),
         }
@@ -94,7 +94,7 @@ impl Lexer {
                 '(' => Tok::LParen,
                 ')' => Tok::RParen,
                 ':' => Tok::Colon,
-                ';' => Tok::Semicolon,
+                ';' => Tok::SemiColon,
                 '\n' => Tok::Eol,
                 '0'..='9' | '.' => return self.number(),
                 'A'..='Z' | 'a'..='z' => return self.identifier(),

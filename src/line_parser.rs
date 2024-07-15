@@ -74,7 +74,7 @@ pub enum LineStmt {
         var: String,
     },
     Print {
-        ex: Box<Expr>,
+        exs: Vec<Expr>,
     },
     End,
     Rem {
@@ -106,7 +106,13 @@ impl std::fmt::Display for LineStmt {
                 write!(f, "FOR {} = {} TO {} STEP {}", var, start, cond, step)
             }
             LineStmt::Next { var } => write!(f, "NEXT {}", var),
-            LineStmt::Print { ex } => write!(f, "PRINT {}", ex),
+            LineStmt::Print { exs } => {
+                write!(f, "PRINT ")?;
+                for ex in exs {
+                    write!(f, "{}; ", ex)?;
+                }
+                Ok(())
+            }
             LineStmt::End => write!(f, "END"),
             LineStmt::Rem { comment } => write!(f, "REM {}", comment),
             LineStmt::Goto { line_number } => write!(f, "GOTO {}", line_number),
@@ -326,6 +332,20 @@ impl Parser {
         }
     }
 
+    fn print_stmt(&mut self) -> LineStmt {
+        // TODO: is an empty PRINT statement valid?
+        let mut exs = Vec::new();
+        loop {
+            exs.push(self.expr());
+            if self.current_token == Tok::SemiColon {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        LineStmt::Print { exs }
+    }
+
     fn atomic_stmt(&mut self) -> LineStmt {
         match self.current_token {
             Tok::Let => {
@@ -342,9 +362,7 @@ impl Parser {
             }
             Tok::Print => {
                 self.advance();
-                LineStmt::Print {
-                    ex: Box::new(self.expr()),
-                }
+                self.print_stmt()
             }
             Tok::End => {
                 self.advance();
