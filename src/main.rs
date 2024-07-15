@@ -1,8 +1,8 @@
 mod lexer;
-mod line_parser;
+mod parser;
 
 use lexer::Lexer;
-use line_parser::Parser;
+use parser::Parser;
 
 fn main() {
     let mut args = std::env::args();
@@ -12,6 +12,9 @@ fn main() {
     let lexer = Lexer::new(input);
 
     let mut parser = Parser::new(lexer);
-    let parse_tree = parser.parse();
-    println!("{}", parse_tree);
+    parser.parse();
+
+    for line in parser.get_lines() {
+        println!("{} {}", line.0, line.1.borrow());
+    }
 }

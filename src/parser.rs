@@ -1,139 +1,101 @@
-use std::collections::BTreeSet;
+use core::panic;
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+};
 
 use super::lexer::{Lexer, Tok};
 
 #[derive(Debug, Clone)]
-pub struct ParsedLines {
-    lines: BTreeSet<Line>,
-}
-
-impl IntoIterator for ParsedLines {
-    type Item = Line;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.lines.into_iter().collect::<Vec<Line>>().into_iter()
-    }
-}
-
-impl std::fmt::Display for ParsedLines {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Don't add newline in last line
-        for line in self.lines.iter().take(self.lines.len() - 1) {
-            writeln!(f, "{}", line)?;
-        }
-        if let Some(last_line) = self.lines.iter().last() {
-            write!(f, "{}", last_line)?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Line {
-    number: u64,
-    stmt: LineStmt,
-}
-
-impl std::cmp::PartialEq for Line {
-    fn eq(&self, other: &Self) -> bool {
-        self.number == other.number
-    }
-}
-
-impl std::cmp::Eq for Line {}
-
-impl std::cmp::PartialOrd for Line {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl std::cmp::Ord for Line {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.number.cmp(&other.number)
-    }
-}
-
-impl std::fmt::Display for Line {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.number, self.stmt)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum LineStmt {
+pub enum Stmt {
     Let {
-        var: String,
-        ex: Box<Aexpr>,
-    },
-    For {
-        var: String,
-        start: Box<Aexpr>,
-        cond: Box<Aexpr>,
-        step: Box<Aexpr>,
+        var: Rc<RefCell<Var>>,
+        ex: Aexpr,
     },
     If {
-        cond: Box<Bexpr>,
-        then: Box<LineStmt>,
-        else_: Option<Box<LineStmt>>,
+        cond: Bexpr,
+        then: Rc<RefCell<Stmt>>,
+        else_: Option<Rc<RefCell<Stmt>>>,
+    },
+    For {
+        var: Rc<RefCell<Var>>,
+        start: Aexpr,
+        cond: Aexpr,
+        step: Aexpr,
+        body: Vec<Rc<RefCell<Stmt>>>,
     },
     Next {
-        var: String,
+        var: Rc<RefCell<Var>>,
     },
     Input {
         prompt: Option<String>,
-        var: String,
+        var: Rc<RefCell<Var>>,
     },
     Print {
         exs: Vec<Aexpr>,
     },
     End,
-    Rem {
-        comment: String,
-    },
+    Rem,
     Goto {
         line_number: u64,
+        to: Option<Rc<RefCell<Stmt>>>,
     },
     Gosub {
         line_number: u64,
+        to: Option<Rc<RefCell<Stmt>>>,
     },
     Return,
     Concat {
-        lhs: Box<LineStmt>,
-        rhs: Box<LineStmt>,
+        lhs: Rc<RefCell<Stmt>>,
+        rhs: Rc<RefCell<Stmt>>,
     },
 }
 
-impl std::fmt::Display for LineStmt {
+impl std::fmt::Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LineStmt::Let { var, ex } => write!(f, "LET {} = {}", var, ex),
-            LineStmt::For {
+            Stmt::Let { var, ex } => write!(f, "LET {} = {}", var.borrow().id, ex),
+            Stmt::For {
                 var,
                 start,
                 cond,
                 step,
+                body,
             } => {
-                write!(f, "FOR {} = {} TO {} STEP {}", var, start, cond, step)
+                write!(
+                    f,
+                    "FOR {} = {} TO {} STEP {}",
+                    var.borrow(),
+                    start,
+                    cond,
+                    step
+                );
+
+                for stmt in body {
+                    write!(f, "\n{}", stmt.borrow())?;
+                }
+
+                write!(f, "\nNEXT {}", var.borrow())?;
+
+                Ok(())
             }
-            LineStmt::If { cond, then, else_ } => {
-                write!(f, "IF {} THEN {}", cond, then)?;
+            Stmt::If { cond, then, else_ } => {
+                write!(f, "IF {} THEN {}", cond, then.borrow())?;
                 if let Some(else_) = else_ {
-                    write!(f, " ELSE {}", else_)?;
+                    write!(f, " ELSE {}", else_.borrow())?;
                 }
                 Ok(())
             }
-            LineStmt::Next { var } => write!(f, "NEXT {}", var),
-            LineStmt::Input { prompt, var } => {
+            Stmt::Next { var } => write!(f, "NEXT {}", var.borrow()),
+            Stmt::Input { prompt, var } => {
                 if let Some(prompt) = prompt {
-                    write!(f, "INPUT \"{}\"; {}", prompt, var)
+                    write!(f, "INPUT \"{}\"; {}", prompt, var.borrow())
                 } else {
-                    write!(f, "INPUT {}", var)
+                    write!(f, "INPUT {}", var.borrow())
                 }
             }
-            LineStmt::Print { exs } => {
+            Stmt::Print { exs } => {
                 write!(f, "PRINT ")?;
                 for (i, ex) in exs.iter().enumerate() {
                     write!(f, "{}", ex)?;
@@ -143,12 +105,32 @@ impl std::fmt::Display for LineStmt {
                 }
                 Ok(())
             }
-            LineStmt::End => write!(f, "END"),
-            LineStmt::Rem { comment } => write!(f, "REM {}", comment),
-            LineStmt::Goto { line_number } => write!(f, "GOTO {}", line_number),
-            LineStmt::Gosub { line_number } => write!(f, "GOSUB {}", line_number),
-            LineStmt::Return => write!(f, "RETURN"),
-            LineStmt::Concat { lhs, rhs } => write!(f, "{}: {}", lhs, rhs),
+            Stmt::End => write!(f, "END"),
+            Stmt::Rem => write!(f, "REM"),
+            Stmt::Goto { line_number, .. } => write!(f, "GOTO {}", line_number),
+            Stmt::Gosub { line_number, .. } => write!(f, "GOSUB {}", line_number),
+            Stmt::Return => write!(f, "RETURN"),
+            Stmt::Concat { lhs, rhs } => write!(f, "{}: {}", lhs.borrow(), rhs.borrow()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AexprOp {
+    Plus,
+    Minus,
+    Star,
+    Slash,
+}
+
+impl From<Tok> for AexprOp {
+    fn from(tok: Tok) -> Self {
+        match tok {
+            Tok::Plus => AexprOp::Plus,
+            Tok::Minus => AexprOp::Minus,
+            Tok::Star => AexprOp::Star,
+            Tok::Slash => AexprOp::Slash,
+            _ => panic!("Unexpected token in AexprOp"),
         }
     }
 }
@@ -156,7 +138,7 @@ impl std::fmt::Display for LineStmt {
 #[derive(Debug, Clone)]
 pub enum Aexpr {
     ArithOp {
-        op: Tok,
+        op: AexprOp,
         lhs: Box<Aexpr>,
         rhs: Box<Aexpr>,
     },
@@ -170,11 +152,10 @@ impl std::fmt::Display for Aexpr {
         match self {
             Aexpr::ArithOp { lhs, op, rhs } => {
                 let op_str = match op {
-                    Tok::Plus => "+",
-                    Tok::Minus => "-",
-                    Tok::Star => "*",
-                    Tok::Slash => "/",
-                    _ => panic!("Unexpected token in BinOp"),
+                    AexprOp::Plus => "+",
+                    AexprOp::Minus => "-",
+                    AexprOp::Star => "*",
+                    AexprOp::Slash => "/",
                 };
                 write!(f, "({} {} {})", lhs, op_str, rhs)
             }
@@ -189,8 +170,8 @@ impl std::fmt::Display for Aexpr {
 pub enum Bexpr {
     ArithOp {
         op: Tok,
-        lhs: Box<Aexpr>,
-        rhs: Box<Aexpr>,
+        lhs: Aexpr,
+        rhs: Aexpr,
     },
     BoolOp {
         op: Tok,
@@ -224,9 +205,42 @@ impl std::fmt::Display for Bexpr {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum VarTy {
+    Num,
+    Str,
+}
+
+#[derive(Debug, Clone)]
+pub struct Var {
+    id: String,
+    ty: VarTy,
+}
+
+impl Var {
+    pub fn new(id: String) -> Self {
+        let ty = if id.ends_with('$') {
+            VarTy::Str
+        } else {
+            VarTy::Num
+        };
+
+        Var { id, ty }
+    }
+}
+
+impl std::fmt::Display for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 pub struct Parser {
     lexer: Lexer,
     current_token: Tok,
+    vars: HashMap<String, Rc<RefCell<Var>>>,
+    lines: BTreeMap<u64, Rc<RefCell<Stmt>>>,
+    dangling_gotos: Vec<(u64, Rc<RefCell<Stmt>>)>,
 }
 
 impl Parser {
@@ -235,11 +249,46 @@ impl Parser {
         Parser {
             lexer,
             current_token,
+            vars: HashMap::new(),
+            lines: BTreeMap::new(),
+            dangling_gotos: Vec::new(),
         }
     }
 
-    pub fn parse(&mut self) -> ParsedLines {
+    pub fn parse(&mut self) {
         self.prgrm()
+    }
+
+    // Getters
+    pub fn get_vars(&self) -> &HashMap<String, Rc<RefCell<Var>>> {
+        &self.vars
+    }
+
+    pub fn get_lines(&self) -> &BTreeMap<u64, Rc<RefCell<Stmt>>> {
+        &self.lines
+    }
+
+    // Linking
+    fn link_var(&mut self, id: String) -> Rc<RefCell<Var>> {
+        if let Some(var) = self.vars.get(&id) {
+            Rc::clone(var)
+        } else {
+            let var = Rc::new(RefCell::new(Var::new(id.clone())));
+            self.vars.insert(id, Rc::clone(&var));
+            var
+        }
+    }
+
+    fn try_link_goto(&mut self, line_number: u64) -> Option<Rc<RefCell<Stmt>>> {
+        if let Some(stmt) = self.lines.get(&line_number) {
+            Some(Rc::clone(stmt))
+        } else {
+            self.dangling_gotos.push((
+                line_number,
+                Rc::clone(self.lines.get(&line_number).unwrap()),
+            ));
+            None
+        }
     }
 
     // Helper functions
@@ -290,10 +339,12 @@ impl Parser {
         let mut node = self.factor();
         while self.current_token == Tok::Star || self.current_token == Tok::Slash {
             let token = self.current_token.clone();
+            let op = AexprOp::from(token);
+
             self.advance();
             node = Aexpr::ArithOp {
                 lhs: Box::new(node),
-                op: token,
+                op,
                 rhs: Box::new(self.factor()),
             };
         }
@@ -304,10 +355,11 @@ impl Parser {
         let mut node = self.term();
         while self.current_token == Tok::Plus || self.current_token == Tok::Minus {
             let token = self.current_token.clone();
+            let op = AexprOp::from(token);
             self.advance();
             node = Aexpr::ArithOp {
                 lhs: Box::new(node),
-                op: token,
+                op,
                 rhs: Box::new(self.term()),
             };
         }
@@ -315,19 +367,16 @@ impl Parser {
     }
 
     fn bexpr(&mut self) -> Bexpr {
-        let anode = self.expr();
+        let lhs = self.expr();
         let node = if self.current_token == Tok::LessThan
             || self.current_token == Tok::GreaterThan
             || self.current_token == Tok::Diamond
             || self.current_token == Tok::Eq
         {
-            let token = self.current_token.clone();
+            let op = self.current_token.clone();
             self.advance();
-            Bexpr::ArithOp {
-                lhs: Box::new(anode),
-                op: token,
-                rhs: Box::new(self.expr()),
-            }
+            let rhs = self.expr();
+            Bexpr::ArithOp { lhs, op, rhs }
         } else {
             panic!(
                 "Expected relational operator, found: {:?}",
@@ -336,11 +385,11 @@ impl Parser {
         };
 
         if self.current_token == Tok::And || self.current_token == Tok::Or {
-            let token = self.current_token.clone();
+            let op = self.current_token.clone();
             self.advance();
             Bexpr::BoolOp {
                 lhs: Box::new(node),
-                op: token,
+                op,
                 rhs: Box::new(self.bexpr()),
             }
         } else {
@@ -349,7 +398,7 @@ impl Parser {
     }
 
     // Line parsing functions
-    fn line(&mut self) -> Line {
+    fn line(&mut self) -> (u64, Rc<RefCell<Stmt>>) {
         let line_number = match self.current_token.clone() {
             Tok::Number(value) => {
                 self.advance();
@@ -360,28 +409,25 @@ impl Parser {
 
         let stmt = self.stmt();
 
-        Line {
-            number: line_number,
-            stmt,
-        }
+        (line_number, stmt)
     }
 
     // Line statement parsing functions
-    fn let_stmt(&mut self) -> LineStmt {
-        if let Tok::Identifier(var) = self.current_token.clone() {
+    fn let_stmt(&mut self) -> Rc<RefCell<Stmt>> {
+        if let Tok::Identifier(id) = self.current_token.clone() {
             self.advance();
             self.eat(Tok::Eq);
-            LineStmt::Let {
-                var,
-                ex: Box::new(self.expr()),
-            }
+            let var = self.link_var(id);
+            let ex = self.expr();
+            Rc::new(RefCell::new(Stmt::Let { var, ex }))
         } else {
             panic!("Expected identifier, found: {:?}", self.current_token);
         }
     }
 
-    fn for_stmt(&mut self) -> LineStmt {
-        if let Tok::Identifier(var) = self.current_token.clone() {
+    fn for_stmt(&mut self) -> Rc<RefCell<Stmt>> {
+        if let Tok::Identifier(id) = self.current_token.clone() {
+            let var = self.link_var(id);
             self.advance();
             self.eat(Tok::Eq);
             let start = self.expr();
@@ -397,45 +443,50 @@ impl Parser {
                 Aexpr::Num(1)
             };
 
-            LineStmt::For {
+            Rc::new(RefCell::new(Stmt::For {
                 var,
-                start: Box::new(start),
-                cond: Box::new(cond),
-                step: Box::new(step),
-            }
+                start,
+                cond,
+                step,
+                body: Vec::new(),
+            }))
         } else {
             panic!("Expected identifier, found: {:?}", self.current_token);
         }
     }
 
-    fn next_stmt(&mut self) -> LineStmt {
-        if let Tok::Identifier(var) = self.current_token.clone() {
+    fn next_stmt(&mut self) -> Rc<RefCell<Stmt>> {
+        if let Tok::Identifier(id) = self.current_token.clone() {
             self.advance();
-            LineStmt::Next { var }
+            let var = self.link_var(id);
+
+            Rc::new(RefCell::new(Stmt::Next { var }))
         } else {
             panic!("Expected identifier, found: {:?}", self.current_token);
         }
     }
 
-    fn goto_stmt(&mut self) -> LineStmt {
+    fn goto_stmt(&mut self) -> Rc<RefCell<Stmt>> {
         if let Tok::Number(line_number) = self.current_token.clone() {
             self.advance();
-            LineStmt::Goto { line_number }
+            let to = self.try_link_goto(line_number);
+            Rc::new(RefCell::new(Stmt::Goto { line_number, to }))
         } else {
             panic!("Expected line number, found: {:?}", self.current_token);
         }
     }
 
-    fn gosub_stmt(&mut self) -> LineStmt {
+    fn gosub_stmt(&mut self) -> Rc<RefCell<Stmt>> {
         if let Tok::Number(line_number) = self.current_token.clone() {
             self.advance();
-            LineStmt::Gosub { line_number }
+            let to = self.try_link_goto(line_number);
+            Rc::new(RefCell::new(Stmt::Gosub { line_number, to }))
         } else {
             panic!("Expected line number, found: {:?}", self.current_token);
         }
     }
 
-    fn print_stmt(&mut self) -> LineStmt {
+    fn print_stmt(&mut self) -> Rc<RefCell<Stmt>> {
         // TODO: is an empty PRINT statement valid?
         let mut exs = Vec::new();
         loop {
@@ -446,27 +497,32 @@ impl Parser {
                 break;
             }
         }
-        LineStmt::Print { exs }
+        Rc::new(RefCell::new(Stmt::Print { exs }))
     }
 
-    fn input_stmt(&mut self) -> LineStmt {
+    fn input_stmt(&mut self) -> Rc<RefCell<Stmt>> {
         match self.current_token.clone() {
             Tok::StringLiteral(prompt) => {
                 self.advance();
                 self.eat(Tok::SemiColon);
-                if let Tok::Identifier(var) = self.current_token.clone() {
+                if let Tok::Identifier(id) = self.current_token.clone() {
                     self.advance();
-                    LineStmt::Input {
+                    let input = Stmt::Input {
                         prompt: Some(prompt),
-                        var,
-                    }
+                        var: self.link_var(id),
+                    };
+                    Rc::new(RefCell::new(input))
                 } else {
                     panic!("Expected identifier, found: {:?}", self.current_token);
                 }
             }
-            Tok::Identifier(var) => {
+            Tok::Identifier(id) => {
                 self.advance();
-                LineStmt::Input { prompt: None, var }
+                let input = Stmt::Input {
+                    prompt: None,
+                    var: self.link_var(id),
+                };
+                Rc::new(RefCell::new(input))
             }
             _ => panic!(
                 "Expected string literal or identifier, found: {:?}",
@@ -475,24 +531,25 @@ impl Parser {
         }
     }
 
-    fn if_stmt(&mut self) -> LineStmt {
+    fn if_stmt(&mut self) -> Rc<RefCell<Stmt>> {
         let cond = self.bexpr();
-        self.eat(Tok::Then);
-        let then = Box::new(self.stmt());
+        // THEN keyword is optional
+        if self.current_token == Tok::Then {
+            self.advance();
+        }
+
+        let then = self.stmt();
         let else_ = if self.current_token == Tok::Else {
             self.advance();
-            Some(Box::new(self.stmt()))
+            Some(self.stmt())
         } else {
             None
         };
-        LineStmt::If {
-            cond: Box::new(cond),
-            then,
-            else_,
-        }
+
+        Rc::new(RefCell::new(Stmt::If { cond, then, else_ }))
     }
 
-    fn atomic_stmt(&mut self) -> LineStmt {
+    fn atomic_stmt(&mut self) -> Rc<RefCell<Stmt>> {
         match self.current_token {
             Tok::Let => {
                 self.advance();
@@ -517,15 +574,11 @@ impl Parser {
             }
             Tok::End => {
                 self.advance();
-                LineStmt::End
+                Rc::new(RefCell::new(Stmt::End))
             }
-            Tok::Rem(_) => {
-                let comment = match self.current_token.clone() {
-                    Tok::Rem(comment) => comment,
-                    _ => panic!("Expected REM comment, found: {:?}", self.current_token),
-                };
+            Tok::Rem => {
                 self.advance();
-                LineStmt::Rem { comment }
+                Rc::new(RefCell::new(Stmt::Rem))
             }
             Tok::Goto => {
                 self.advance();
@@ -537,7 +590,7 @@ impl Parser {
             }
             Tok::Return => {
                 self.advance();
-                LineStmt::Return
+                Rc::new(RefCell::new(Stmt::Return))
             }
             Tok::If => {
                 self.advance();
@@ -550,7 +603,7 @@ impl Parser {
         }
     }
 
-    fn stmt(&mut self) -> LineStmt {
+    fn stmt(&mut self) -> Rc<RefCell<Stmt>> {
         let lhs = self.atomic_stmt();
 
         if self.current_token != Tok::Colon {
@@ -561,15 +614,12 @@ impl Parser {
 
         self.eat(Tok::Colon);
         let rhs = self.stmt();
-        LineStmt::Concat {
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-        }
+
+        let stmt = Stmt::Concat { lhs, rhs };
+        Rc::new(RefCell::new(stmt))
     }
 
-    fn prgrm(&mut self) -> ParsedLines {
-        let mut lines = BTreeSet::new();
-
+    fn prgrm(&mut self) {
         loop {
             while self.current_token == Tok::Eol {
                 self.advance();
@@ -579,11 +629,15 @@ impl Parser {
                 break;
             }
 
-            let line = self.line();
-            let line_number = line.number;
+            let (line_number, stmt) = self.line();
+
+            // Ignore comments
+            if let Stmt::Rem { .. } = &*stmt.borrow() {
+                continue;
+            }
 
             // Check for duplicate line numbers
-            if !lines.insert(line) {
+            if self.lines.insert(line_number, stmt).is_some() {
                 panic!("Duplicate line number: {}", line_number);
             }
 
@@ -597,6 +651,25 @@ impl Parser {
             }
         }
 
-        ParsedLines { lines }
+        // Link dangling GOTO and GOSUB statements
+        while !self.dangling_gotos.is_empty() {
+            if let Some((line_number, stmt)) = self.dangling_gotos.pop() {
+                match &mut *stmt.borrow_mut() {
+                    Stmt::Goto { to, .. } => {
+                        *to = self.try_link_goto(line_number);
+                        if to.is_none() {
+                            panic!("Unresolved GOTO statement: {}", line_number);
+                        }
+                    }
+                    Stmt::Gosub { to, .. } => {
+                        *to = self.try_link_goto(line_number);
+                        if to.is_none() {
+                            panic!("Unresolved GOSUB statement: {}", line_number);
+                        }
+                    }
+                    _ => panic!("Expected GOTO or GOSUB statement"),
+                }
+            }
+        }
     }
 }

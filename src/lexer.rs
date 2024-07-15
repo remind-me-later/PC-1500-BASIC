@@ -16,7 +16,7 @@ pub enum Tok {
     Then,
     Else,
     // comments
-    Rem(String),
+    Rem,
     // Identifiers
     Identifier(String),
     // Literals
@@ -59,7 +59,7 @@ impl std::fmt::Display for Tok {
             Tok::If => write!(f, "IF"),
             Tok::Then => write!(f, "THEN"),
             Tok::Else => write!(f, "ELSE"),
-            Tok::Rem(comment) => write!(f, "REM {}", comment),
+            Tok::Rem => write!(f, "REM"),
             Tok::Identifier(id) => write!(f, "{}", id),
             Tok::Number(num) => write!(f, "{}", num),
             Tok::StringLiteral(s) => write!(f, "\"{}\"", s),
@@ -176,23 +176,32 @@ impl Lexer {
     }
 
     fn rem(&mut self) -> Tok {
-        let mut comment = String::new();
+        // let mut comment = String::new();
         while let Some(ch) = self.current_char {
             if ch == '\n' {
                 break;
             }
-            comment.push(ch);
+            // comment.push(ch);
             self.advance();
         }
-        Tok::Rem(comment)
+        Tok::Rem
     }
 
     fn identifier(&mut self) -> Tok {
         let mut id_str = String::new();
+        let mut dollar_sign = false;
 
         while let Some(ch) = self.current_char {
-            if ch.is_alphanumeric() || ch == '$' {
+            if ch.is_alphanumeric() {
+                if dollar_sign {
+                    // Dollar sign can only be used at the end of an identifier
+                    panic!("Syntax Error: Invalid identifier");
+                }
                 id_str.push(ch);
+                self.advance();
+            } else if ch == '$' {
+                id_str.push(ch);
+                dollar_sign = true;
                 self.advance();
             } else {
                 break;
