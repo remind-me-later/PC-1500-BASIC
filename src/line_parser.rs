@@ -1,8 +1,10 @@
+use std::collections::BTreeSet;
+
 use super::lexer::{Lexer, Tok};
 
 #[derive(Debug, Clone)]
 pub struct ParsedLines {
-    lines: Vec<Line>,
+    lines: BTreeSet<Line>,
 }
 
 impl IntoIterator for ParsedLines {
@@ -10,7 +12,7 @@ impl IntoIterator for ParsedLines {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.lines.into_iter()
+        self.lines.into_iter().collect::<Vec<Line>>().into_iter()
     }
 }
 
@@ -26,13 +28,33 @@ impl std::fmt::Display for ParsedLines {
 
 #[derive(Debug, Clone)]
 pub struct Line {
-    line_number: u64,
+    number: u64,
     stmt: LineStmt,
+}
+
+impl std::cmp::PartialEq for Line {
+    fn eq(&self, other: &Self) -> bool {
+        self.number == other.number
+    }
+}
+
+impl std::cmp::Eq for Line {}
+
+impl std::cmp::PartialOrd for Line {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for Line {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.number.cmp(&other.number)
+    }
 }
 
 impl std::fmt::Display for Line {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.line_number, self.stmt)
+        write!(f, "{} {}", self.number, self.stmt)
     }
 }
 
@@ -224,7 +246,10 @@ impl Parser {
 
         let stmt = self.line_stmt();
 
-        Line { line_number, stmt }
+        Line {
+            number: line_number,
+            stmt,
+        }
     }
 
     // Line statement parsing functions
@@ -349,15 +374,34 @@ impl Parser {
     }
 
     fn prgrm(&mut self) -> ParsedLines {
-        let mut lines = vec![];
+        let mut lines = BTreeSet::new();
 
-        while self.current_token != Tok::Eof {
-            lines.push(self.line());
-            self.eat(Tok::Eol);
+        loop {
+            while self.current_token == Tok::Eol {
+                self.advance();
+            }
+
+            if self.current_token == Tok::Eof {
+                break;
+            }
+
+            let line = self.line();
+            let line_number = line.number;
+
+            // Check for duplicate line numbers
+            if !lines.insert(line) {
+                panic!("Duplicate line number: {}", line_number);
+            }
+
+            // Check for EOL or EOF
+            if self.current_token == Tok::Eol {
+                self.advance();
+            } else if self.current_token == Tok::Eof {
+                break;
+            } else {
+                panic!("Expected EOL or EOF, found: {:?}", self.current_token);
+            }
         }
-
-        // sort by line numbers
-        lines.sort_by(|a, b| a.line_number.cmp(&b.line_number));
 
         ParsedLines { lines }
     }
