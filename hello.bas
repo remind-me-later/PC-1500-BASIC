@@ -1,5 +1,5 @@
 5 REM Hello, World! in BASIC
-10 LET N=10
+10 N=10
 20 FOR I=1 TO N
 30 PRINT "Hello, World!"
 100 PRINT X; 1: END

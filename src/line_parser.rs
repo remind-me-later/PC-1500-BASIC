@@ -498,6 +498,7 @@ impl Parser {
                 self.advance();
                 self.let_stmt()
             }
+            Tok::Identifier(_) => self.let_stmt(),
             Tok::For => {
                 self.advance();
                 self.for_stmt()
