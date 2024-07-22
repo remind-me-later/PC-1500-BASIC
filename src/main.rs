@@ -212,7 +212,7 @@ impl std::fmt::Display for Line<'_> {
 
 #[derive(Debug)]
 struct Program<'a> {
-    lines: Vec<&'a Line<'a>>,
+    lines: Vec<Line<'a>>,
 }
 
 impl std::fmt::Display for Program<'_> {
@@ -225,7 +225,6 @@ impl std::fmt::Display for Program<'_> {
 }
 
 struct Parser<'parser> {
-    arena: Arena<Line<'parser>>,
     stmt_arena: Arena<Statement<'parser>>,
     expr_arena: Arena<Expression<'parser>>,
 }
@@ -233,7 +232,6 @@ struct Parser<'parser> {
 impl<'parser> Parser<'parser> {
     pub fn new() -> Self {
         Self {
-            arena: Arena::new(),
             stmt_arena: Arena::new(),
             expr_arena: Arena::new(),
         }
@@ -598,14 +596,14 @@ impl<'parser> Parser<'parser> {
     fn parse_line<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, &'parser Line<'parser>> {
+    ) -> IResult<&'input str, Line<'parser>> {
         let (input, (number, _, statement)) = tuple((
             move |i| self.parse_line_number(i),
             space1,
             move |i| self.parse_statement(i),
         ))(input)?;
-        let line = self.arena.alloc(Line { number, statement });
-        Ok((input, line))
+
+        Ok((input, Line { number, statement }))
     }
 
     fn parse_program<'input>(
