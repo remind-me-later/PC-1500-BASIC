@@ -10,32 +10,51 @@ use nom::{
 use std::str::FromStr;
 use typed_arena::Arena;
 
-#[derive(Debug)]
 enum BinaryOperator {
+    // Arithmetic
     Add,
     Sub,
     Mul,
     Div,
+    // Logical
+    And,
+    Or,
+    // Comparison
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }
 
 impl std::fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            // Arithmetic
             BinaryOperator::Add => write!(f, "+"),
             BinaryOperator::Sub => write!(f, "-"),
             BinaryOperator::Mul => write!(f, "*"),
             BinaryOperator::Div => write!(f, "/"),
+            // Logical
+            BinaryOperator::And => write!(f, "AND"),
+            BinaryOperator::Or => write!(f, "OR"),
+            // Comparison
+            BinaryOperator::Eq => write!(f, "="),
+            BinaryOperator::Ne => write!(f, "<>"),
+            BinaryOperator::Lt => write!(f, "<"),
+            BinaryOperator::Le => write!(f, "<="),
+            BinaryOperator::Gt => write!(f, ">"),
+            BinaryOperator::Ge => write!(f, ">="),
         }
     }
 }
 
-#[derive(Debug)]
 enum VariableType {
     Integer,
     String,
 }
 
-#[derive(Debug)]
 struct Variable {
     name: String,
     variable_type: VariableType,
@@ -56,7 +75,6 @@ impl std::fmt::Display for Variable {
     }
 }
 
-#[derive(Debug)]
 enum Expression<'a> {
     Literal(i32),
     Variable(Variable),
@@ -75,7 +93,6 @@ impl std::fmt::Display for Expression<'_> {
     }
 }
 
-#[derive(Debug)]
 enum PrintContent<'a> {
     Literal(String),
     Expression(Expression<'a>),
@@ -90,7 +107,6 @@ impl std::fmt::Display for PrintContent<'_> {
     }
 }
 
-#[derive(Debug)]
 enum Statement<'a> {
     Let {
         variable: Variable,
@@ -198,7 +214,6 @@ impl std::fmt::Display for Statement<'_> {
     }
 }
 
-#[derive(Debug)]
 struct Line<'a> {
     number: u32,
     statement: Statement<'a>,
@@ -210,7 +225,6 @@ impl std::fmt::Display for Line<'_> {
     }
 }
 
-#[derive(Debug)]
 struct Program<'a> {
     lines: Vec<Line<'a>>,
 }
@@ -356,12 +370,81 @@ impl<'parser> Parser<'parser> {
         }
     }
 
-    // TODO: is this the best way to handle the recursive nature of the parser?
+    fn parse_comparison<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
+        fn parse_comparison_sign(input: &str) -> IResult<&str, BinaryOperator> {
+            alt((
+                map(tag("="), |_| BinaryOperator::Eq),
+                map(tag("<>"), |_| BinaryOperator::Ne),
+                map(tag("<="), |_| BinaryOperator::Le),
+                map(tag(">="), |_| BinaryOperator::Ge),
+                map(tag("<"), |_| BinaryOperator::Lt),
+                map(tag(">"), |_| BinaryOperator::Gt),
+            ))(input)
+        }
+
+        let (input, left) = self.parse_add_sub(input)?;
+
+        // try to parse a comparison operator
+        let (input, right) = opt(preceded(multispace0, move |i| {
+            let (i, op) = parse_comparison_sign(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, right) = self.parse_add_sub(i)?;
+
+            Ok((i, (op, right)))
+        }))(input)?;
+
+        // if we didn't find an operator, return the left expression
+        if let Some((op, right)) = right {
+            let left = self.expr_arena.alloc(left);
+            let right = self.expr_arena.alloc(right);
+
+            Ok((input, Expression::BinaryOp(left, op, right)))
+        } else {
+            Ok((input, left))
+        }
+    }
+
+    fn parse_and_or<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
+        fn parse_and_or_sign(input: &str) -> IResult<&str, BinaryOperator> {
+            alt((
+                map(tag("AND"), |_| BinaryOperator::And),
+                map(tag("OR"), |_| BinaryOperator::Or),
+            ))(input)
+        }
+
+        let (input, left) = self.parse_comparison(input)?;
+
+        // try to parse an AND or OR operator
+        let (input, right) = opt(preceded(multispace0, move |i| {
+            let (i, op) = parse_and_or_sign(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, right) = self.parse_comparison(i)?;
+
+            Ok((i, (op, right)))
+        }))(input)?;
+
+        // if we didn't find an operator, return the left expression
+        if let Some((op, right)) = right {
+            let left = self.expr_arena.alloc(left);
+            let right = self.expr_arena.alloc(right);
+
+            Ok((input, Expression::BinaryOp(left, op, right)))
+        } else {
+            Ok((input, left))
+        }
+    }
+
     fn parse_expression<'input>(
         &'parser self,
         input: &'input str,
     ) -> IResult<&'input str, Expression<'parser>> {
-        self.parse_add_sub(input)
+        self.parse_and_or(input)
     }
 
     fn parse_let<'input>(
@@ -369,11 +452,11 @@ impl<'parser> Parser<'parser> {
         input: &'input str,
     ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("LET")(input)?;
-        let (input, _) = space1(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, variable) = self.parse_variable(input)?;
-        let (input, _) = space1(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, _) = tag("=")(input)?;
-        let (input, _) = space1(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, expression) = self.parse_expression(input)?;
 
         Ok((
@@ -478,10 +561,9 @@ impl<'parser> Parser<'parser> {
         input: &'input str,
     ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("IF")(input)?;
-        let (input, _) = space1(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, condition) = self.parse_expression(input)?;
-        let (input, _) = space1(input)?;
-        let (input, _) = tag("THEN")(input)?;
+        let (input, _) = opt(preceded(space1, tag("THEN")))(input)?;
         let (input, _) = space1(input)?;
 
         let (input, then) = self.parse_atomic_statement(input)?;
@@ -512,9 +594,9 @@ impl<'parser> Parser<'parser> {
         let (input, _) = tag("FOR")(input)?;
         let (input, _) = space1(input)?;
         let (input, variable) = self.parse_variable(input)?;
-        let (input, _) = space1(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, _) = tag("=")(input)?;
-        let (input, _) = space1(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, from) = self.parse_expression(input)?;
         let (input, _) = space1(input)?;
         let (input, _) = tag("TO")(input)?;
@@ -593,6 +675,24 @@ impl<'parser> Parser<'parser> {
         }
     }
 
+    // Comment lines start with REM
+    fn parse_comment<'input>(&'parser self, input: &'input str) -> IResult<&'input str, ()> {
+        let (input, _) = tag("REM")(input)?;
+        let (input, _) = take_while(|c: char| c != '\n')(input)?;
+
+        Ok((input, ()))
+    }
+
+    fn parse_comment_line<'input>(&'parser self, input: &'input str) -> IResult<&'input str, ()> {
+        let (input, _) = tuple((
+            move |i| self.parse_line_number(i),
+            space1,
+            move |i| self.parse_comment(i),
+        ))(input)?;
+
+        Ok((input, ()))
+    }
+
     fn parse_line<'input>(
         &'parser self,
         input: &'input str,
@@ -619,6 +719,13 @@ impl<'parser> Parser<'parser> {
             if new_input.is_empty() {
                 break;
             }
+
+            let (new_input, _) = opt(move |i| self.parse_comment_line(i))(new_input)?;
+            let (new_input, _) = multispace0(new_input)?;
+            if new_input.is_empty() {
+                break;
+            }
+
             let (new_input, line) = self.parse_line(new_input)?;
             lines.push(line);
             input = new_input;
@@ -632,19 +739,12 @@ impl<'parser> Parser<'parser> {
 }
 
 fn main() {
-    let input = r#"
-5 LET X = 1 * Y + 1
-10 PRINT "Hello, World!"; X
-15 INPUT "What is your name?"; NAME$
-20 GOTO 10
-30 FOR I = 1 TO 10 STEP 2
-40 PRINT I
-50 NEXT I: PRINT "SEQ": PRINT "OF": PRINT "STATEMENTS"
-"#;
+    // Read file from first argument
+    let input = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
     let parser = Parser::new();
 
-    match parser.parse_program(input) {
+    match parser.parse_program(&input) {
         Ok((_, program)) => println!("{}", program),
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }
