@@ -84,7 +84,7 @@ enum PrintContent<'a> {
 impl std::fmt::Display for PrintContent<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PrintContent::Literal(content) => write!(f, "{}", content),
+            PrintContent::Literal(content) => write!(f, "\"{}\"", content),
             PrintContent::Expression(expr) => write!(f, "{}", expr),
         }
     }
@@ -103,7 +103,31 @@ enum Statement<'a> {
         prompt: Option<String>,
         variable: Variable,
     },
-    Goto(u32),
+    For {
+        variable: Variable,
+        from: Expression<'a>,
+        to: Expression<'a>,
+        step: Option<Expression<'a>>,
+    },
+    Next {
+        variable: Variable,
+    },
+    Goto {
+        line_number: u32,
+    },
+    End,
+    GoSub {
+        line_number: u32,
+    },
+    Return,
+    If {
+        condition: Expression<'a>,
+        then: &'a Statement<'a>,
+        else_: Option<&'a Statement<'a>>,
+    },
+    Seq {
+        statements: Vec<Statement<'a>>,
+    },
 }
 
 impl std::fmt::Display for Statement<'_> {
@@ -132,7 +156,44 @@ impl std::fmt::Display for Statement<'_> {
                 }
                 write!(f, "{}", variable)
             }
-            Statement::Goto(line_number) => write!(f, "GOTO {}", line_number),
+            Statement::Goto { line_number } => write!(f, "GOTO {}", line_number),
+            Statement::For {
+                variable,
+                from,
+                to,
+                step,
+            } => {
+                write!(f, "FOR {} = {} TO {}", variable, from, to)?;
+                if let Some(step) = step {
+                    write!(f, " STEP {}", step)?;
+                }
+                Ok(())
+            }
+            Statement::Next { variable } => write!(f, "NEXT {}", variable),
+            Statement::End => write!(f, "END"),
+            Statement::GoSub { line_number } => write!(f, "GOSUB {}", line_number),
+            Statement::Return => write!(f, "RETURN"),
+            Statement::If {
+                condition,
+                then,
+                else_,
+            } => {
+                write!(f, "IF {} THEN {}", condition, then)?;
+                if let Some(else_) = else_ {
+                    write!(f, " ELSE {}", else_)?;
+                }
+                Ok(())
+            }
+            Statement::Seq { statements } => {
+                for (i, statement) in statements.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ": ")?;
+                    }
+                    write!(f, "{}", statement)?;
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -163,29 +224,31 @@ impl std::fmt::Display for Program<'_> {
     }
 }
 
-struct Parser<'a> {
-    arena: Arena<Line<'a>>,
-    expr_arena: Arena<Expression<'a>>,
+struct Parser<'parser> {
+    arena: Arena<Line<'parser>>,
+    stmt_arena: Arena<Statement<'parser>>,
+    expr_arena: Arena<Expression<'parser>>,
 }
 
-impl<'a> Parser<'a> {
+impl<'parser> Parser<'parser> {
     pub fn new() -> Self {
         Self {
             arena: Arena::new(),
+            stmt_arena: Arena::new(),
             expr_arena: Arena::new(),
         }
     }
 
-    fn parse_line_number<'b>(&'a self, input: &'b str) -> IResult<&'b str, u32> {
+    fn parse_line_number<'input>(&'parser self, input: &'input str) -> IResult<&'input str, u32> {
         map_res(digit1, u32::from_str)(input)
     }
 
-    fn parse_number<'b>(&'a self, input: &'b str) -> IResult<&'b str, i32> {
+    fn parse_number<'input>(&'parser self, input: &'input str) -> IResult<&'input str, i32> {
         map_res(digit1, i32::from_str)(input)
     }
 
     // variables are sequences of alphabetic characters, optionally followed by a dollar sign, to indicate a string variable
-    fn parse_variable<'b>(&'a self, input: &'b str) -> IResult<&'b str, Variable> {
+    fn parse_variable<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Variable> {
         let (input, name) = take_while(|c: char| c.is_alphabetic())(input)?;
         let (input, variable_type) = opt(tag("$"))(input)?;
 
@@ -204,7 +267,10 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_factor<'b>(&'a self, input: &'b str) -> IResult<&'b str, Expression<'a>> {
+    fn parse_factor<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
         alt((
             map(move |i| self.parse_number(i), Expression::Literal),
             map(move |i| self.parse_variable(i), Expression::Variable),
@@ -212,7 +278,10 @@ impl<'a> Parser<'a> {
         ))(input)
     }
 
-    fn parse_parens_expression<'b>(&'a self, input: &'b str) -> IResult<&'b str, Expression<'a>> {
+    fn parse_parens_expression<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
         delimited(
             tag("("),
             preceded(multispace0, move |i| {
@@ -223,7 +292,10 @@ impl<'a> Parser<'a> {
         )(input)
     }
 
-    fn parse_mul_div<'b>(&'a self, input: &'b str) -> IResult<&'b str, Expression<'a>> {
+    fn parse_mul_div<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
         fn parse_mul_div_sign(input: &str) -> IResult<&str, BinaryOperator> {
             alt((
                 map(tag("*"), |_| BinaryOperator::Mul),
@@ -232,14 +304,18 @@ impl<'a> Parser<'a> {
         }
 
         let (input, left) = self.parse_factor(input)?;
-        let (input, _) = multispace0(input)?;
 
         // try to parse a multiplication or division operator
-        // if we didn't find an operator, return the left expression
-        if let Ok((input, op)) = parse_mul_div_sign(input) {
-            let (input, _) = multispace0(input)?;
-            let (input, right) = self.parse_mul_div(input)?;
+        let (input, right) = opt(preceded(multispace0, move |i| {
+            let (i, op) = parse_mul_div_sign(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, right) = self.parse_mul_div(i)?;
 
+            Ok((i, (op, right)))
+        }))(input)?;
+
+        // if we didn't find an operator, return the left expression
+        if let Some((op, right)) = right {
             let left = self.expr_arena.alloc(left);
             let right = self.expr_arena.alloc(right);
 
@@ -249,7 +325,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_add_sub<'b>(&'a self, input: &'b str) -> IResult<&'b str, Expression<'a>> {
+    fn parse_add_sub<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
         fn parse_add_sub_sign(input: &str) -> IResult<&str, BinaryOperator> {
             alt((
                 map(tag("+"), |_| BinaryOperator::Add),
@@ -258,14 +337,18 @@ impl<'a> Parser<'a> {
         }
 
         let (input, left) = self.parse_mul_div(input)?;
-        let (input, _) = multispace0(input)?;
 
         // try to parse an addition or subtraction operator
-        // if we didn't find an operator, return the left expression
-        if let Ok((input, op)) = parse_add_sub_sign(input) {
-            let (input, _) = multispace0(input)?;
-            let (input, right) = self.parse_add_sub(input)?;
+        let (input, right) = opt(preceded(multispace0, move |i| {
+            let (i, op) = parse_add_sub_sign(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, right) = self.parse_add_sub(i)?;
 
+            Ok((i, (op, right)))
+        }))(input)?;
+
+        // if we didn't find an operator, return the left expression
+        if let Some((op, right)) = right {
             let left = self.expr_arena.alloc(left);
             let right = self.expr_arena.alloc(right);
 
@@ -276,11 +359,17 @@ impl<'a> Parser<'a> {
     }
 
     // TODO: is this the best way to handle the recursive nature of the parser?
-    fn parse_expression<'b>(&'a self, input: &'b str) -> IResult<&'b str, Expression<'a>> {
+    fn parse_expression<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Expression<'parser>> {
         self.parse_add_sub(input)
     }
 
-    fn parse_let<'b>(&'a self, input: &'b str) -> IResult<&'b str, Statement<'a>> {
+    fn parse_let<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("LET")(input)?;
         let (input, _) = space1(input)?;
         let (input, variable) = self.parse_variable(input)?;
@@ -298,13 +387,19 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_string_literal<'b>(&'a self, input: &'b str) -> IResult<&'b str, String> {
+    fn parse_string_literal<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, String> {
         let (input, content) =
             delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""))(input)?;
         Ok((input, content.to_string()))
     }
 
-    fn parse_print<'b>(&'a self, input: &'b str) -> IResult<&'b str, Statement<'a>> {
+    fn parse_print<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("PRINT")(input)?;
         let (input, _) = space1(input)?;
 
@@ -322,7 +417,10 @@ impl<'a> Parser<'a> {
     }
 
     // INPUT "name"; NAME$
-    fn parse_input<'b>(&'a self, input: &'b str) -> IResult<&'b str, Statement<'a>> {
+    fn parse_input<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("INPUT")(input)?;
         let (input, _) = space1(input)?;
 
@@ -346,24 +444,161 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_goto<'b>(&'a self, input: &'b str) -> IResult<&'b str, Statement<'a>> {
+    fn parse_goto<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("GOTO")(input)?;
         let (input, _) = space1(input)?;
         let (input, line_number) = self.parse_line_number(input)?;
 
-        Ok((input, Statement::Goto(line_number)))
+        Ok((input, Statement::Goto { line_number }))
     }
 
-    fn parse_statement<'b>(&'a self, input: &'b str) -> IResult<&'b str, Statement<'a>> {
+    fn parse_gosub<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, _) = tag("GOSUB")(input)?;
+        let (input, _) = space1(input)?;
+        let (input, line_number) = self.parse_line_number(input)?;
+
+        Ok((input, Statement::GoSub { line_number }))
+    }
+
+    fn parse_return<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, _) = tag("RETURN")(input)?;
+
+        Ok((input, Statement::Return))
+    }
+
+    fn parse_if<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, _) = tag("IF")(input)?;
+        let (input, _) = space1(input)?;
+        let (input, condition) = self.parse_expression(input)?;
+        let (input, _) = space1(input)?;
+        let (input, _) = tag("THEN")(input)?;
+        let (input, _) = space1(input)?;
+
+        let (input, then) = self.parse_atomic_statement(input)?;
+        let then = &*self.stmt_arena.alloc(then);
+
+        let (input, else_) = opt(preceded(space1, move |i| {
+            let (i, _) = tag("ELSE")(i)?;
+            let (i, _) = space1(i)?;
+            let (i, else_) = self.parse_atomic_statement(i)?;
+            let else_ = &*self.stmt_arena.alloc(else_);
+            Ok((i, else_))
+        }))(input)?;
+
+        Ok((
+            input,
+            Statement::If {
+                condition,
+                then,
+                else_,
+            },
+        ))
+    }
+
+    fn parse_for<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, _) = tag("FOR")(input)?;
+        let (input, _) = space1(input)?;
+        let (input, variable) = self.parse_variable(input)?;
+        let (input, _) = space1(input)?;
+        let (input, _) = tag("=")(input)?;
+        let (input, _) = space1(input)?;
+        let (input, from) = self.parse_expression(input)?;
+        let (input, _) = space1(input)?;
+        let (input, _) = tag("TO")(input)?;
+        let (input, _) = space1(input)?;
+        let (input, to) = self.parse_expression(input)?;
+        let (input, step) = opt(preceded(space1, move |i| {
+            let (i, _) = tag("STEP")(i)?;
+            let (i, _) = space1(i)?;
+            let (i, step) = self.parse_expression(i)?;
+            Ok((i, step))
+        }))(input)?;
+
+        Ok((
+            input,
+            Statement::For {
+                variable,
+                from,
+                to,
+                step,
+            },
+        ))
+    }
+
+    fn parse_next<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, _) = tag("NEXT")(input)?;
+        let (input, _) = space1(input)?;
+        let (input, variable) = self.parse_variable(input)?;
+
+        Ok((input, Statement::Next { variable }))
+    }
+
+    fn parse_end<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, _) = tag("END")(input)?;
+
+        Ok((input, Statement::End))
+    }
+
+    fn parse_atomic_statement<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         alt((
             move |i| self.parse_let(i),
             move |i| self.parse_print(i),
             move |i| self.parse_input(i),
             move |i| self.parse_goto(i),
+            move |i| self.parse_for(i),
+            move |i| self.parse_next(i),
+            move |i| self.parse_end(i),
+            move |i| self.parse_gosub(i),
+            move |i| self.parse_if(i),
+            move |i| self.parse_return(i),
         ))(input)
     }
 
-    fn parse_line<'b>(&'a self, input: &'b str) -> IResult<&'b str, &'a Line<'a>> {
+    fn parse_statement<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
+        let (input, statements) = separated_list1(
+            preceded(multispace0, tag(":")),
+            preceded(multispace0, move |i| self.parse_atomic_statement(i)),
+        )(input)?;
+
+        if statements.len() == 1 {
+            let statement = statements.into_iter().next().unwrap();
+            Ok((input, statement))
+        } else {
+            Ok((input, Statement::Seq { statements }))
+        }
+    }
+
+    fn parse_line<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, &'parser Line<'parser>> {
         let (input, (number, _, statement)) = tuple((
             move |i| self.parse_line_number(i),
             space1,
@@ -373,7 +608,10 @@ impl<'a> Parser<'a> {
         Ok((input, line))
     }
 
-    fn parse_program<'b>(&'a self, input: &'b str) -> IResult<&'b str, Program<'a>> {
+    fn parse_program<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Program<'parser>> {
         let mut lines = Vec::new();
         let mut input = input;
 
@@ -401,6 +639,9 @@ fn main() {
 10 PRINT "Hello, World!"; X
 15 INPUT "What is your name?"; NAME$
 20 GOTO 10
+30 FOR I = 1 TO 10 STEP 2
+40 PRINT I
+50 NEXT I: PRINT "SEQ": PRINT "OF": PRINT "STATEMENTS"
 "#;
 
     let parser = Parser::new();
