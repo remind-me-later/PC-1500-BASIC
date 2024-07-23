@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Statement, StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
+use crate::dag::{Statement, StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Ty {
@@ -94,9 +94,9 @@ impl<'a> ExpressionVisitor<'a> for SymbolTableBuilderVisitor<'a> {
 
     fn visit_binary_op(
         &mut self,
-        left: &crate::ast::Expression<'a>,
-        _: crate::ast::BinaryOperator,
-        right: &crate::ast::Expression<'a>,
+        left: &crate::dag::Expression<'a>,
+        _: crate::dag::BinaryOperator,
+        right: &crate::dag::Expression<'a>,
     ) {
         left.accept(self);
         right.accept(self);
@@ -104,16 +104,16 @@ impl<'a> ExpressionVisitor<'a> for SymbolTableBuilderVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for SymbolTableBuilderVisitor<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &crate::ast::Expression<'a>) {
+    fn visit_let(&mut self, variable: &'a str, expression: &crate::dag::Expression<'a>) {
         self.symbol_table.insert(variable);
         expression.accept(self);
     }
 
-    fn visit_print(&mut self, content: &[crate::ast::PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &[crate::dag::PrintContent<'a>]) {
         for item in content {
             match item {
-                crate::ast::PrintContent::StringLiteral(_) => {}
-                crate::ast::PrintContent::Expression(expr) => expr.accept(self),
+                crate::dag::PrintContent::StringLiteral(_) => {}
+                crate::dag::PrintContent::Expression(expr) => expr.accept(self),
             }
         }
     }
@@ -127,9 +127,9 @@ impl<'a> StatementVisitor<'a> for SymbolTableBuilderVisitor<'a> {
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &crate::ast::Expression<'a>,
-        to: &crate::ast::Expression<'a>,
-        step: Option<&crate::ast::Expression<'a>>,
+        from: &crate::dag::Expression<'a>,
+        to: &crate::dag::Expression<'a>,
+        step: Option<&crate::dag::Expression<'a>>,
     ) {
         self.symbol_table.insert(variable);
         from.accept(self);
@@ -151,7 +151,7 @@ impl<'a> StatementVisitor<'a> for SymbolTableBuilderVisitor<'a> {
 
     fn visit_if(
         &mut self,
-        condition: &crate::ast::Expression<'a>,
+        condition: &crate::dag::Expression<'a>,
         then: &'a Statement<'a>,
         else_: Option<&'a Statement<'a>>,
     ) {

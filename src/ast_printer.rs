@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::ast::{StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
+use crate::dag::{StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
 
 pub struct AstPrintVisitor<'a> {
     indent: usize,
@@ -17,7 +17,7 @@ impl<'a> AstPrintVisitor<'a> {
         }
     }
 
-    pub fn build(self, ast: &'a crate::ast::Program<'a>) -> String {
+    pub fn build(self, ast: &'a crate::dag::Program<'a>) -> String {
         let mut visitor = AstPrintVisitor::new();
         ast.accept(&mut visitor);
         visitor.output
@@ -42,9 +42,9 @@ impl<'a> ExpressionVisitor<'a> for AstPrintVisitor<'a> {
 
     fn visit_binary_op(
         &mut self,
-        left: &crate::ast::Expression<'a>,
-        op: crate::ast::BinaryOperator,
-        right: &crate::ast::Expression<'a>,
+        left: &crate::dag::Expression<'a>,
+        op: crate::dag::BinaryOperator,
+        right: &crate::dag::Expression<'a>,
     ) {
         self.output.push('(');
         left.accept(self);
@@ -57,26 +57,26 @@ impl<'a> ExpressionVisitor<'a> for AstPrintVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &crate::ast::Expression<'a>) {
+    fn visit_let(&mut self, variable: &'a str, expression: &crate::dag::Expression<'a>) {
         self.output.push_str("LET ");
         self.output.push_str(variable);
         self.output.push_str(" = ");
         expression.accept(self);
     }
 
-    fn visit_print(&mut self, content: &[crate::ast::PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &[crate::dag::PrintContent<'a>]) {
         self.output.push_str("PRINT ");
         for (i, item) in content.iter().enumerate() {
             if i > 0 {
                 self.output.push_str("; ");
             }
             match item {
-                crate::ast::PrintContent::StringLiteral(s) => {
+                crate::dag::PrintContent::StringLiteral(s) => {
                     self.output.push('"');
                     self.output.push_str(s);
                     self.output.push('"');
                 }
-                crate::ast::PrintContent::Expression(expr) => {
+                crate::dag::PrintContent::Expression(expr) => {
                     expr.accept(self);
                 }
             }
@@ -94,7 +94,7 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
         self.output.push_str(variable);
     }
 
-    fn visit_goto(&mut self, line_number: u32, _: Option<&'a crate::ast::Statement<'a>>) {
+    fn visit_goto(&mut self, line_number: u32, _: Option<&'a crate::dag::Statement<'a>>) {
         self.output.push_str("GOTO ");
         self.output.push_str(&line_number.to_string());
     }
@@ -102,9 +102,9 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &crate::ast::Expression<'a>,
-        to: &crate::ast::Expression<'a>,
-        step: Option<&crate::ast::Expression<'a>>,
+        from: &crate::dag::Expression<'a>,
+        to: &crate::dag::Expression<'a>,
+        step: Option<&crate::dag::Expression<'a>>,
     ) {
         self.output.push_str("FOR ");
         self.output.push_str(variable);
@@ -130,7 +130,7 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
         self.output.push_str("END");
     }
 
-    fn visit_gosub(&mut self, line_number: u32, _: Option<&'a crate::ast::Statement<'a>>) {
+    fn visit_gosub(&mut self, line_number: u32, _: Option<&'a crate::dag::Statement<'a>>) {
         self.output.push_str("GOSUB ");
         self.output.push_str(&line_number.to_string());
     }
@@ -141,9 +141,9 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
 
     fn visit_if(
         &mut self,
-        condition: &crate::ast::Expression<'a>,
-        then: &'a crate::ast::Statement<'a>,
-        else_: Option<&'a crate::ast::Statement<'a>>,
+        condition: &crate::dag::Expression<'a>,
+        then: &'a crate::dag::Statement<'a>,
+        else_: Option<&'a crate::dag::Statement<'a>>,
     ) {
         self.output.push_str("IF ");
         condition.accept(self);
@@ -155,7 +155,7 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [crate::ast::Statement<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [crate::dag::Statement<'a>]) {
         // colon separated list
         for (i, statement) in statements.iter().enumerate() {
             if i > 0 {

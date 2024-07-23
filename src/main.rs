@@ -1,8 +1,8 @@
-mod ast;
 mod ast_printer;
+mod dag;
 mod parser;
-mod symbol_table;
 mod semantic_check;
+mod symbol_table;
 
 use parser::Parser;
 use typed_arena::Arena;

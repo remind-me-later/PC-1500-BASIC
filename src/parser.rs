@@ -1,4 +1,4 @@
-use crate::ast::{Statement, BinaryOperator, Expression, PrintContent, Program};
+use crate::dag::{BinaryOperator, Expression, PrintContent, Program, Statement};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
@@ -15,7 +15,9 @@ pub struct Parser<'parser> {
     stmt_arena: &'parser Arena<Statement<'parser>>,
     expr_arena: &'parser Arena<Expression<'parser>>,
     str_arena: &'parser Arena<String>,
-    variable_map: RefCell<HashMap<&'parser str, &'parser str>>,
+
+    str_map: RefCell<HashMap<&'parser str, &'parser str>>,
+    expr_map: RefCell<HashMap<&'parser Expression<'parser>, &'parser Expression<'parser>>>,
 }
 
 impl<'parser> Parser<'parser> {
@@ -28,7 +30,28 @@ impl<'parser> Parser<'parser> {
             stmt_arena,
             expr_arena,
             str_arena,
-            variable_map: RefCell::new(HashMap::new()),
+            str_map: RefCell::new(HashMap::new()),
+            expr_map: RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn get_str(&self, s: &str) -> &'parser str {
+        if self.str_map.borrow().contains_key(s) {
+            self.str_map.borrow().get(s).unwrap()
+        } else {
+            let s = self.str_arena.alloc(s.to_string());
+            self.str_map.borrow_mut().insert(s, s);
+            s
+        }
+    }
+
+    fn get_expr(&self, expr: Expression<'parser>) -> &'parser Expression<'parser> {
+        if self.expr_map.borrow().contains_key(&expr) {
+            self.expr_map.borrow().get(&expr).unwrap()
+        } else {
+            let expr = self.expr_arena.alloc(expr);
+            self.expr_map.borrow_mut().insert(expr, expr);
+            expr
         }
     }
 
@@ -46,47 +69,47 @@ impl<'parser> Parser<'parser> {
         input: &'input str,
     ) -> IResult<&'input str, &'parser str> {
         let (input, name) = recognize(tuple((alpha1, alphanumeric0, opt(tag("$")))))(input)?;
-
-        if let Some(variable) = self.variable_map.borrow().get(name) {
-            return Ok((input, variable));
-        }
-
-        let name = self.str_arena.alloc(name.to_string());
-
-        self.variable_map.borrow_mut().insert(name, name);
-
-        Ok((input, name))
+        Ok((input, self.get_str(name)))
     }
 
     fn parse_factor<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
-        alt((
-            map(Self::parse_number, Expression::NumberLiteral),
-            map(move |i| self.parse_variable(i), Expression::Variable),
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
+        let (input, expr) = alt((
+            map(Self::parse_number, |i| {
+                self.get_expr(Expression::NumberLiteral(i))
+            }),
+            map(
+                move |i| self.parse_variable(i),
+                |i| self.get_expr(Expression::Variable(i)),
+            ),
             move |i| self.parse_parens_expression(i),
-        ))(input)
+        ))(input)?;
+
+        Ok((input, expr))
     }
 
     fn parse_parens_expression<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
-        delimited(
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
+        let (input, expr) = delimited(
             tag("("),
             preceded(multispace0, move |i| {
                 let (i, expr) = self.parse_expression(i)?;
                 Ok((i, expr))
             }),
             tag(")"),
-        )(input)
+        )(input)?;
+
+        Ok((input, expr))
     }
 
     fn parse_mul_div<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
         fn parse_mul_div_sign(input: &str) -> IResult<&str, BinaryOperator> {
             alt((
                 map(tag("*"), |_| BinaryOperator::Mul),
@@ -107,10 +130,10 @@ impl<'parser> Parser<'parser> {
 
         // if we didn't find an operator, return the left expression
         if let Some((op, right)) = right {
-            let left = self.expr_arena.alloc(left);
-            let right = self.expr_arena.alloc(right);
-
-            Ok((input, Expression::BinaryOp { left, op, right }))
+            Ok((
+                input,
+                self.get_expr(Expression::BinaryOp { left, op, right }),
+            ))
         } else {
             Ok((input, left))
         }
@@ -119,7 +142,7 @@ impl<'parser> Parser<'parser> {
     fn parse_add_sub<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
         fn parse_add_sub_sign(input: &str) -> IResult<&str, BinaryOperator> {
             alt((
                 map(tag("+"), |_| BinaryOperator::Add),
@@ -140,10 +163,10 @@ impl<'parser> Parser<'parser> {
 
         // if we didn't find an operator, return the left expression
         if let Some((op, right)) = right {
-            let left = self.expr_arena.alloc(left);
-            let right = self.expr_arena.alloc(right);
-
-            Ok((input, Expression::BinaryOp { left, op, right }))
+            Ok((
+                input,
+                self.get_expr(Expression::BinaryOp { left, op, right }),
+            ))
         } else {
             Ok((input, left))
         }
@@ -152,7 +175,7 @@ impl<'parser> Parser<'parser> {
     fn parse_comparison<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
         fn parse_comparison_sign(input: &str) -> IResult<&str, BinaryOperator> {
             alt((
                 map(tag("="), |_| BinaryOperator::Eq),
@@ -176,20 +199,21 @@ impl<'parser> Parser<'parser> {
         }))(input)?;
 
         // if we didn't find an operator, return the left expression
-        if let Some((op, right)) = right {
-            let left = self.expr_arena.alloc(left);
-            let right = self.expr_arena.alloc(right);
-
-            Ok((input, Expression::BinaryOp { left, op, right }))
+        let var_name = if let Some((op, right)) = right {
+            Ok((
+                input,
+                self.get_expr(Expression::BinaryOp { left, op, right }),
+            ))
         } else {
             Ok((input, left))
-        }
+        };
+        var_name
     }
 
     fn parse_and_or<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
         fn parse_and_or_sign(input: &str) -> IResult<&str, BinaryOperator> {
             alt((
                 map(tag("AND"), |_| BinaryOperator::And),
@@ -210,10 +234,10 @@ impl<'parser> Parser<'parser> {
 
         // if we didn't find an operator, return the left expression
         if let Some((op, right)) = right {
-            let left = self.expr_arena.alloc(left);
-            let right = self.expr_arena.alloc(right);
-
-            Ok((input, Expression::BinaryOp { left, op, right }))
+            Ok((
+                input,
+                self.get_expr(Expression::BinaryOp { left, op, right }),
+            ))
         } else {
             Ok((input, left))
         }
@@ -222,11 +246,14 @@ impl<'parser> Parser<'parser> {
     fn parse_expression<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Expression<'parser>> {
+    ) -> IResult<&'input str, &'parser Expression<'parser>> {
         self.parse_and_or(input)
     }
 
-    fn parse_let<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
+    fn parse_let<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         // LET keyoword is optional
         let (input, _) = opt(tag("LET"))(input)?;
         let (input, _) = multispace0(input)?;
@@ -248,10 +275,11 @@ impl<'parser> Parser<'parser> {
     fn parse_string_literal<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, String> {
+    ) -> IResult<&'input str, &'parser str> {
         let (input, content) =
             delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""))(input)?;
-        Ok((input, content.to_string()))
+
+        Ok((input, self.get_str(content)))
     }
 
     fn parse_print<'input>(
@@ -299,13 +327,16 @@ impl<'parser> Parser<'parser> {
         Ok((
             input,
             Statement::Input {
-                prompt: prompt.map(|s| s.to_string()),
+                prompt: prompt.map(|s| self.get_str(s)),
                 variable,
             },
         ))
     }
 
-    fn parse_goto<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
+    fn parse_goto<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("GOTO")(input)?;
         let (input, _) = space1(input)?;
         let (input, line_number) = Self::parse_line_number(input)?;
@@ -345,7 +376,10 @@ impl<'parser> Parser<'parser> {
         Ok((input, Statement::Return))
     }
 
-    fn parse_if<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
+    fn parse_if<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("IF")(input)?;
         let (input, _) = multispace0(input)?;
         let (input, condition) = self.parse_expression(input)?;
@@ -373,7 +407,10 @@ impl<'parser> Parser<'parser> {
         ))
     }
 
-    fn parse_for<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
+    fn parse_for<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("FOR")(input)?;
         let (input, _) = space1(input)?;
         let (input, variable) = self.parse_variable(input)?;
@@ -403,7 +440,10 @@ impl<'parser> Parser<'parser> {
         ))
     }
 
-    fn parse_next<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
+    fn parse_next<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("NEXT")(input)?;
         let (input, _) = space1(input)?;
         let (input, variable) = self.parse_variable(input)?;
@@ -411,7 +451,10 @@ impl<'parser> Parser<'parser> {
         Ok((input, Statement::Next { variable }))
     }
 
-    fn parse_end<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
+    fn parse_end<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("END")(input)?;
 
         Ok((input, Statement::End))
