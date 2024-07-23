@@ -1,5 +1,8 @@
 mod ast;
 mod parser;
+mod semantic_analysis;
+mod symbol_table;
+mod type_checking;
 
 use parser::Parser;
 use typed_arena::Arena;

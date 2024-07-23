@@ -269,7 +269,7 @@ impl<'parser> Parser<'parser> {
             // semi-colon followed by optional whitespace
             delimited(tag(";"), multispace0, multispace0),
             alt((
-                map(move |i| self.parse_string_literal(i), PrintContent::Literal),
+                map(move |i| self.parse_string_literal(i), PrintContent::StringLiteral),
                 map(move |i| self.parse_expression(i), PrintContent::Expression),
             )),
         )(input)?;
