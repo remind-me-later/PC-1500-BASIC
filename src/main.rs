@@ -3,6 +3,7 @@ mod dag;
 mod parser;
 mod semantic_check;
 mod symbol_table;
+mod tac;
 
 use parser::Parser;
 use typed_arena::Arena;

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dag::{Statement, StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
+use crate::dag::{ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Ty {
     Int,
     String,

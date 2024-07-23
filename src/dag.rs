@@ -168,9 +168,9 @@ pub trait ExpressionVisitor<'a, RetTy = ()> {
     fn visit_variable(&mut self, variable: &'a str) -> RetTy;
     fn visit_binary_op(
         &mut self,
-        left: &Expression<'a>,
+        left: &'a Expression<'a>,
         op: BinaryOperator,
-        right: &Expression<'a>,
+        right: &'a Expression<'a>,
     ) -> RetTy;
 }
 
