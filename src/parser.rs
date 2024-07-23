@@ -67,7 +67,7 @@ impl<'parser> Parser<'parser> {
         input: &'input str,
     ) -> IResult<&'input str, Expression<'parser>> {
         alt((
-            map(Self::parse_number, Expression::Literal),
+            map(Self::parse_number, Expression::NumberLiteral),
             map(move |i| self.parse_variable(i), Expression::Variable),
             move |i| self.parse_parens_expression(i),
         ))(input)

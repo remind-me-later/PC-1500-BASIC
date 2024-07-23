@@ -1,15 +1,35 @@
 use std::collections::HashMap;
 
-use crate::ast::{Ast, AstVisitor};
+use crate::ast::{Ast, AstVisitor, ExpressionVisitor};
 
-pub enum VariableType {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Ty {
     Int,
     String,
 }
 
+impl std::fmt::Display for Ty {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Ty::Int => write!(f, "INT"),
+            Ty::String => write!(f, "STRING"),
+        }
+    }
+}
+
 pub struct VariableInfo<'a> {
     name: &'a str,
-    ty: VariableType,
+    ty: Ty,
+}
+
+impl<'a> VariableInfo<'a> {
+    pub fn name(&self) -> &'a str {
+        self.name
+    }
+
+    pub fn ty(&self) -> Ty {
+        self.ty
+    }
 }
 
 pub struct SymbolTable<'a> {
@@ -25,15 +45,24 @@ impl<'a> SymbolTable<'a> {
 
     pub fn insert(&mut self, name: &'a str) {
         let ty = if name.ends_with('$') {
-            VariableType::String
+            Ty::String
         } else {
-            VariableType::Int
+            Ty::Int
         };
         self.symbols.insert(name, VariableInfo { name, ty });
     }
 
     pub fn lookup(&self, name: &'a str) -> Option<&VariableInfo<'a>> {
         self.symbols.get(name)
+    }
+}
+
+impl std::fmt::Display for SymbolTable<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for (name, info) in &self.symbols {
+            writeln!(f, "{} is {}", name, info.ty())?;
+        }
+        Ok(())
     }
 }
 
@@ -54,12 +83,12 @@ impl<'a> SymbolTableBuilderVisitor<'a> {
     }
 }
 
-impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
+impl<'a> ExpressionVisitor<'a> for SymbolTableBuilderVisitor<'a> {
     fn visit_variable(&mut self, name: &'a str) {
         self.symbol_table.insert(name)
     }
 
-    fn visit_literal(&mut self, _: i32) {}
+    fn visit_number_literal(&mut self, _: i32) {}
 
     fn visit_binary_op(
         &mut self,
@@ -70,7 +99,9 @@ impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
         left.accept(self);
         right.accept(self);
     }
+}
 
+impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &crate::ast::Expression<'a>) {
         self.symbol_table.insert(variable);
         expression.accept(self);

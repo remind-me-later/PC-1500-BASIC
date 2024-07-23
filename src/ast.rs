@@ -42,7 +42,7 @@ impl std::fmt::Display for BinaryOperator {
 }
 
 pub enum Expression<'a> {
-    Literal(i32),
+    NumberLiteral(i32),
     Variable(&'a str),
     BinaryOp {
         left: &'a mut Expression<'a>,
@@ -54,7 +54,7 @@ pub enum Expression<'a> {
 impl std::fmt::Display for Expression<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Literal(value) => write!(f, "{}", value),
+            Expression::NumberLiteral(value) => write!(f, "{}", value),
             Expression::Variable(variable) => write!(f, "{}", variable),
             Expression::BinaryOp { left, op, right } => write!(f, "{} {} {}", left, op, right),
         }
@@ -194,18 +194,54 @@ impl std::fmt::Display for Ast<'_> {
     }
 }
 
-pub trait AstVisitor<'a> {
-    // Expressions
-    fn visit_literal(&mut self, num: i32);
-    fn visit_variable(&mut self, variable: &'a str);
+pub trait ExpressionVisitor<'a, RetTy = ()> {
+    fn visit_number_literal(&mut self, num: i32) -> RetTy;
+    fn visit_variable(&mut self, variable: &'a str) -> RetTy;
     fn visit_binary_op(
         &mut self,
         left: &Expression<'a>,
         op: BinaryOperator,
         right: &Expression<'a>,
-    );
+    ) -> RetTy;
+}
 
-    // Statements
+pub trait MutExpressionVisitor<'a, RetTy = ()> {
+    fn visit_number_literal(&mut self, num: i32) -> RetTy;
+    fn visit_variable(&mut self, variable: &'a str) -> RetTy;
+    fn visit_binary_op(
+        &mut self,
+        left: &mut Expression<'a>,
+        op: BinaryOperator,
+        right: &mut Expression<'a>,
+    ) -> RetTy;
+}
+
+impl<'a> Expression<'a> {
+    pub fn accept<V: ExpressionVisitor<'a, RetTy>, RetTy>(&self, visitor: &mut V) -> RetTy {
+        match self {
+            Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
+            Expression::Variable(variable) => visitor.visit_variable(variable),
+            Expression::BinaryOp { left, op, right } => visitor.visit_binary_op(left, *op, right),
+        }
+    }
+
+    pub fn accept_mut<V: MutExpressionVisitor<'a, RetTy>, RetTy>(
+        &mut self,
+        visitor: &mut V,
+    ) -> RetTy {
+        match self {
+            Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
+            Expression::Variable(variable) => visitor.visit_variable(variable),
+            Expression::BinaryOp { left, op, right } => {
+                left.accept_mut(visitor);
+                right.accept_mut(visitor);
+                visitor.visit_binary_op(left, *op, right)
+            }
+        }
+    }
+}
+
+pub trait AstVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>);
     fn visit_print(&mut self, content: &[PrintContent<'a>]);
     fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str);
@@ -232,17 +268,6 @@ pub trait AstVisitor<'a> {
 }
 
 pub trait MutAstVisitor<'a> {
-    // Expressions
-    fn visit_literal(&mut self, num: i32);
-    fn visit_variable(&mut self, variable: &'a str);
-    fn visit_binary_op(
-        &mut self,
-        left: &mut Expression<'a>,
-        op: BinaryOperator,
-        right: &mut Expression<'a>,
-    );
-
-    // Statements
     fn visit_let(&mut self, variable: &'a str, expression: &mut Expression<'a>);
     fn visit_print(&mut self, content: &mut Vec<PrintContent<'a>>);
     fn visit_input(&mut self, prompt: &mut Option<String>, variable: &'a str);
@@ -266,28 +291,6 @@ pub trait MutAstVisitor<'a> {
     );
     fn visit_seq(&mut self, statements: &mut Vec<Ast<'a>>);
     fn visit_program(&mut self, lines: &mut BTreeMap<u32, Ast<'a>>);
-}
-
-impl<'a> Expression<'a> {
-    pub fn accept<V: AstVisitor<'a>>(&self, visitor: &mut V) {
-        match self {
-            Expression::Literal(num) => visitor.visit_literal(*num),
-            Expression::Variable(variable) => visitor.visit_variable(variable),
-            Expression::BinaryOp { left, op, right } => visitor.visit_binary_op(left, *op, right),
-        }
-    }
-
-    pub fn accept_mut<V: MutAstVisitor<'a>>(&mut self, visitor: &mut V) {
-        match self {
-            Expression::Literal(num) => visitor.visit_literal(*num),
-            Expression::Variable(variable) => visitor.visit_variable(variable),
-            Expression::BinaryOp { left, op, right } => {
-                left.accept_mut(visitor);
-                right.accept_mut(visitor);
-                visitor.visit_binary_op(left, *op, right)
-            }
-        }
-    }
 }
 
 impl<'a> Ast<'a> {

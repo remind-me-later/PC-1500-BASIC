@@ -19,7 +19,14 @@ fn main() {
     let parser = Parser::new(&stmt_arena, &expr_arena, &str_arena);
 
     match parser.parse(&input) {
-        Ok((_, ast)) => println!("{}", ast),
+        Ok((_, ast)) => {
+            println!("Ast:\n{}", ast);
+            let symbol_table = symbol_table::SymbolTableBuilderVisitor::new().build(&ast);
+            println!("Symbols:\n{}", symbol_table);
+            let type_checker = type_checking::TypeCheckVisitor::new(&symbol_table);
+            let res = type_checker.check(&ast);
+            println!("Type errors: {:?}", res);
+        }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }
 }
