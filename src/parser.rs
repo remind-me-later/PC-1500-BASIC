@@ -231,7 +231,8 @@ impl<'parser> Parser<'parser> {
     }
 
     fn parse_let<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
-        let (input, _) = tag("LET")(input)?;
+        // LET keyoword is optional
+        let (input, _) = opt(tag("LET"))(input)?;
         let (input, _) = multispace0(input)?;
         let (input, variable) = self.parse_variable(input)?;
         let (input, _) = multispace0(input)?;
