@@ -1,4 +1,4 @@
-use crate::ast::{Ast, BinaryOperator, Expression, PrintContent};
+use crate::ast::{Statement, BinaryOperator, Expression, PrintContent, Program};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
@@ -8,15 +8,11 @@ use nom::{
     sequence::{delimited, preceded, tuple},
     IResult,
 };
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-};
+use std::{cell::RefCell, collections::HashMap, str::FromStr};
 use typed_arena::Arena;
 
 pub struct Parser<'parser> {
-    stmt_arena: &'parser Arena<Ast<'parser>>,
+    stmt_arena: &'parser Arena<Statement<'parser>>,
     expr_arena: &'parser Arena<Expression<'parser>>,
     str_arena: &'parser Arena<String>,
     variable_map: RefCell<HashMap<&'parser str, &'parser str>>,
@@ -24,7 +20,7 @@ pub struct Parser<'parser> {
 
 impl<'parser> Parser<'parser> {
     pub fn new(
-        stmt_arena: &'parser Arena<Ast<'parser>>,
+        stmt_arena: &'parser Arena<Statement<'parser>>,
         expr_arena: &'parser Arena<Expression<'parser>>,
         str_arena: &'parser Arena<String>,
     ) -> Self {
@@ -230,7 +226,7 @@ impl<'parser> Parser<'parser> {
         self.parse_and_or(input)
     }
 
-    fn parse_let<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    fn parse_let<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
         // LET keyoword is optional
         let (input, _) = opt(tag("LET"))(input)?;
         let (input, _) = multispace0(input)?;
@@ -242,7 +238,7 @@ impl<'parser> Parser<'parser> {
 
         Ok((
             input,
-            Ast::Let {
+            Statement::Let {
                 variable,
                 expression,
             },
@@ -261,7 +257,7 @@ impl<'parser> Parser<'parser> {
     fn parse_print<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("PRINT")(input)?;
         let (input, _) = space1(input)?;
 
@@ -270,19 +266,22 @@ impl<'parser> Parser<'parser> {
             // semi-colon followed by optional whitespace
             delimited(tag(";"), multispace0, multispace0),
             alt((
-                map(move |i| self.parse_string_literal(i), PrintContent::StringLiteral),
+                map(
+                    move |i| self.parse_string_literal(i),
+                    PrintContent::StringLiteral,
+                ),
                 map(move |i| self.parse_expression(i), PrintContent::Expression),
             )),
         )(input)?;
 
-        Ok((input, Ast::Print { content }))
+        Ok((input, Statement::Print { content }))
     }
 
     // INPUT "name"; NAME$
     fn parse_input<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("INPUT")(input)?;
         let (input, _) = space1(input)?;
 
@@ -299,21 +298,21 @@ impl<'parser> Parser<'parser> {
 
         Ok((
             input,
-            Ast::Input {
+            Statement::Input {
                 prompt: prompt.map(|s| s.to_string()),
                 variable,
             },
         ))
     }
 
-    fn parse_goto<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    fn parse_goto<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("GOTO")(input)?;
         let (input, _) = space1(input)?;
         let (input, line_number) = Self::parse_line_number(input)?;
 
         Ok((
             input,
-            Ast::Goto {
+            Statement::Goto {
                 line_number,
                 to: None,
             },
@@ -323,14 +322,14 @@ impl<'parser> Parser<'parser> {
     fn parse_gosub<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("GOSUB")(input)?;
         let (input, _) = space1(input)?;
         let (input, line_number) = Self::parse_line_number(input)?;
 
         Ok((
             input,
-            Ast::GoSub {
+            Statement::GoSub {
                 line_number,
                 to: None,
             },
@@ -340,13 +339,13 @@ impl<'parser> Parser<'parser> {
     fn parse_return<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("RETURN")(input)?;
 
-        Ok((input, Ast::Return))
+        Ok((input, Statement::Return))
     }
 
-    fn parse_if<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    fn parse_if<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("IF")(input)?;
         let (input, _) = multispace0(input)?;
         let (input, condition) = self.parse_expression(input)?;
@@ -366,7 +365,7 @@ impl<'parser> Parser<'parser> {
 
         Ok((
             input,
-            Ast::If {
+            Statement::If {
                 condition,
                 then,
                 else_,
@@ -374,7 +373,7 @@ impl<'parser> Parser<'parser> {
         ))
     }
 
-    fn parse_for<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    fn parse_for<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("FOR")(input)?;
         let (input, _) = space1(input)?;
         let (input, variable) = self.parse_variable(input)?;
@@ -395,7 +394,7 @@ impl<'parser> Parser<'parser> {
 
         Ok((
             input,
-            Ast::For {
+            Statement::For {
                 variable,
                 from,
                 to,
@@ -404,24 +403,24 @@ impl<'parser> Parser<'parser> {
         ))
     }
 
-    fn parse_next<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    fn parse_next<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("NEXT")(input)?;
         let (input, _) = space1(input)?;
         let (input, variable) = self.parse_variable(input)?;
 
-        Ok((input, Ast::Next { variable }))
+        Ok((input, Statement::Next { variable }))
     }
 
-    fn parse_end<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    fn parse_end<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Statement<'parser>> {
         let (input, _) = tag("END")(input)?;
 
-        Ok((input, Ast::End))
+        Ok((input, Statement::End))
     }
 
     fn parse_atomic_statement<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
+    ) -> IResult<&'input str, Statement<'parser>> {
         alt((
             move |i| self.parse_let(i),
             move |i| self.parse_print(i),
@@ -439,7 +438,7 @@ impl<'parser> Parser<'parser> {
     fn parse_statement<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
+    ) -> IResult<&'input str, Statement<'parser>> {
         let (input, statements) = separated_list1(
             preceded(multispace0, tag(":")),
             preceded(multispace0, move |i| self.parse_atomic_statement(i)),
@@ -449,7 +448,7 @@ impl<'parser> Parser<'parser> {
             let statement = statements.into_iter().next().unwrap();
             Ok((input, statement))
         } else {
-            Ok((input, Ast::Seq { statements }))
+            Ok((input, Statement::Seq { statements }))
         }
     }
 
@@ -474,7 +473,7 @@ impl<'parser> Parser<'parser> {
     fn parse_line<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, (u32, Ast<'parser>)> {
+    ) -> IResult<&'input str, (u32, Statement<'parser>)> {
         let (input, (number, _, statement)) = tuple((
             move |i| Self::parse_line_number(i),
             space1,
@@ -487,8 +486,8 @@ impl<'parser> Parser<'parser> {
     fn parse_program<'input>(
         &'parser self,
         input: &'input str,
-    ) -> IResult<&'input str, Ast<'parser>> {
-        let mut lines = BTreeMap::new();
+    ) -> IResult<&'input str, Program<'parser>> {
+        let mut program = Program::new();
         let mut input = input;
 
         // TODO: improve this loop
@@ -505,14 +504,17 @@ impl<'parser> Parser<'parser> {
             }
 
             let (new_input, line) = self.parse_line(new_input)?;
-            lines.insert(line.0, line.1);
+            program.add_line(line.0, line.1);
             input = new_input;
         }
 
-        Ok((input, Ast::Program { lines }))
+        Ok((input, program))
     }
 
-    pub fn parse<'input>(&'parser self, input: &'input str) -> IResult<&'input str, Ast<'parser>> {
+    pub fn parse<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Program<'parser>> {
         let (input, program) = self.parse_program(input)?;
 
         Ok((input, program))

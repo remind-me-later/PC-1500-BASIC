@@ -75,7 +75,7 @@ impl std::fmt::Display for PrintContent<'_> {
     }
 }
 
-pub enum Ast<'a> {
+pub enum Statement<'a> {
     Let {
         variable: &'a str,
         expression: Expression<'a>,
@@ -98,25 +98,50 @@ pub enum Ast<'a> {
     },
     Goto {
         line_number: u32,
-        to: Option<&'a mut Ast<'a>>,
+        to: Option<&'a mut Statement<'a>>,
     },
     End,
     GoSub {
         line_number: u32,
-        to: Option<&'a mut Ast<'a>>,
+        to: Option<&'a mut Statement<'a>>,
     },
     Return,
     If {
         condition: Expression<'a>,
-        then: &'a mut Ast<'a>,
-        else_: Option<&'a mut Ast<'a>>,
+        then: &'a mut Statement<'a>,
+        else_: Option<&'a mut Statement<'a>>,
     },
     Seq {
-        statements: Vec<Ast<'a>>,
+        statements: Vec<Statement<'a>>,
     },
-    Program {
-        lines: BTreeMap<u32, Ast<'a>>,
-    },
+}
+
+pub struct Program<'a> {
+    pub lines: BTreeMap<u32, Statement<'a>>,
+}
+
+impl<'a> Program<'a> {
+    pub fn new() -> Self {
+        Program {
+            lines: BTreeMap::new(),
+        }
+    }
+
+    pub fn add_line(&mut self, line_number: u32, ast: Statement<'a>) {
+        self.lines.insert(line_number, ast);
+    }
+
+    pub fn lookup_line(&self, line_number: u32) -> Option<&Statement<'a>> {
+        self.lines.get(&line_number)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&u32, &Statement<'a>)> {
+        self.lines.iter()
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &Statement<'a>> {
+        self.lines.values()
+    }
 }
 
 pub trait ExpressionVisitor<'a, RetTy = ()> {
@@ -166,11 +191,11 @@ impl<'a> Expression<'a> {
     }
 }
 
-pub trait AstVisitor<'a> {
+pub trait StatementVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>);
     fn visit_print(&mut self, content: &[PrintContent<'a>]);
     fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str);
-    fn visit_goto(&mut self, line_number: u32, to: Option<&'a Ast<'a>>);
+    fn visit_goto(&mut self, line_number: u32, to: Option<&'a Statement<'a>>);
     fn visit_for(
         &mut self,
         variable: &'a str,
@@ -180,23 +205,22 @@ pub trait AstVisitor<'a> {
     );
     fn visit_next(&mut self, variable: &'a str);
     fn visit_end(&mut self);
-    fn visit_gosub(&mut self, line_number: u32, to: Option<&'a Ast<'a>>);
+    fn visit_gosub(&mut self, line_number: u32, to: Option<&'a Statement<'a>>);
     fn visit_return(&mut self);
     fn visit_if(
         &mut self,
         condition: &Expression<'a>,
-        then: &'a Ast<'a>,
-        else_: Option<&'a Ast<'a>>,
+        then: &'a Statement<'a>,
+        else_: Option<&'a Statement<'a>>,
     );
-    fn visit_seq(&mut self, statements: &'a [Ast<'a>]);
-    fn visit_program(&mut self, lines: &'a BTreeMap<u32, Ast<'a>>);
+    fn visit_seq(&mut self, statements: &'a [Statement<'a>]);
 }
 
-pub trait MutAstVisitor<'a> {
+pub trait MutStatementVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &mut Expression<'a>);
     fn visit_print(&mut self, content: &mut Vec<PrintContent<'a>>);
     fn visit_input(&mut self, prompt: &mut Option<String>, variable: &'a str);
-    fn visit_goto(&mut self, line_number: u32, to: &mut Option<&'a mut Ast<'a>>);
+    fn visit_goto(&mut self, line_number: u32, to: &mut Option<&'a mut Statement<'a>>);
     fn visit_for(
         &mut self,
         variable: &'a str,
@@ -206,74 +230,93 @@ pub trait MutAstVisitor<'a> {
     );
     fn visit_next(&mut self, variable: &'a str);
     fn visit_end(&mut self);
-    fn visit_gosub(&mut self, line_number: u32, to: &mut Option<&'a mut Ast<'a>>);
+    fn visit_gosub(&mut self, line_number: u32, to: &mut Option<&'a mut Statement<'a>>);
     fn visit_return(&mut self);
     fn visit_if(
         &mut self,
         condition: &mut Expression<'a>,
-        then: &mut Ast<'a>,
-        else_: &mut Option<&'a mut Ast<'a>>,
+        then: &mut Statement<'a>,
+        else_: &mut Option<&'a mut Statement<'a>>,
     );
-    fn visit_seq(&mut self, statements: &mut Vec<Ast<'a>>);
-    fn visit_program(&mut self, lines: &mut BTreeMap<u32, Ast<'a>>);
+    fn visit_seq(&mut self, statements: &mut Vec<Statement<'a>>);
 }
 
-impl<'a> Ast<'a> {
-    pub fn accept<V: AstVisitor<'a>>(&'a self, visitor: &mut V) {
+impl<'a> Statement<'a> {
+    pub fn accept<V: StatementVisitor<'a>>(&'a self, visitor: &mut V) {
         match self {
-            Ast::Let {
+            Statement::Let {
                 variable,
                 expression,
             } => visitor.visit_let(variable, expression),
-            Ast::Print { content } => visitor.visit_print(content),
-            Ast::Input { prompt, variable } => visitor.visit_input(prompt.as_deref(), variable),
-            Ast::Goto { line_number, to } => visitor.visit_goto(*line_number, to.as_deref()),
-            Ast::For {
+            Statement::Print { content } => visitor.visit_print(content),
+            Statement::Input { prompt, variable } => {
+                visitor.visit_input(prompt.as_deref(), variable)
+            }
+            Statement::Goto { line_number, to } => visitor.visit_goto(*line_number, to.as_deref()),
+            Statement::For {
                 variable,
                 from,
                 to,
                 step,
             } => visitor.visit_for(variable, from, to, step.as_ref()),
-            Ast::Next { variable } => visitor.visit_next(variable),
-            Ast::End => visitor.visit_end(),
-            Ast::GoSub { line_number, to } => visitor.visit_gosub(*line_number, to.as_deref()),
-            Ast::Return => visitor.visit_return(),
-            Ast::If {
+            Statement::Next { variable } => visitor.visit_next(variable),
+            Statement::End => visitor.visit_end(),
+            Statement::GoSub { line_number, to } => {
+                visitor.visit_gosub(*line_number, to.as_deref())
+            }
+            Statement::Return => visitor.visit_return(),
+            Statement::If {
                 condition,
                 then,
                 else_,
             } => visitor.visit_if(condition, then, else_.as_deref()),
-            Ast::Seq { statements } => visitor.visit_seq(statements),
-            Ast::Program { lines } => visitor.visit_program(lines),
+            Statement::Seq { statements } => visitor.visit_seq(statements),
         }
     }
 
-    pub fn accept_mut<V: MutAstVisitor<'a>>(&'a mut self, visitor: &mut V) {
+    pub fn accept_mut<V: MutStatementVisitor<'a>>(&'a mut self, visitor: &mut V) {
         match self {
-            Ast::Let {
+            Statement::Let {
                 variable,
                 expression,
             } => visitor.visit_let(variable, expression),
-            Ast::Print { content } => visitor.visit_print(content),
-            Ast::Input { prompt, variable } => visitor.visit_input(prompt, variable),
-            Ast::Goto { line_number, to } => visitor.visit_goto(*line_number, to),
-            Ast::For {
+            Statement::Print { content } => visitor.visit_print(content),
+            Statement::Input { prompt, variable } => visitor.visit_input(prompt, variable),
+            Statement::Goto { line_number, to } => visitor.visit_goto(*line_number, to),
+            Statement::For {
                 variable,
                 from,
                 to,
                 step,
             } => visitor.visit_for(variable, from, to, step),
-            Ast::Next { variable } => visitor.visit_next(variable),
-            Ast::End => visitor.visit_end(),
-            Ast::GoSub { line_number, to } => visitor.visit_gosub(*line_number, to),
-            Ast::Return => visitor.visit_return(),
-            Ast::If {
+            Statement::Next { variable } => visitor.visit_next(variable),
+            Statement::End => visitor.visit_end(),
+            Statement::GoSub { line_number, to } => visitor.visit_gosub(*line_number, to),
+            Statement::Return => visitor.visit_return(),
+            Statement::If {
                 condition,
                 then,
                 else_,
             } => visitor.visit_if(condition, then, else_),
-            Ast::Seq { statements } => visitor.visit_seq(statements),
-            Ast::Program { lines } => visitor.visit_program(lines),
+            Statement::Seq { statements } => visitor.visit_seq(statements),
         }
+    }
+}
+
+pub trait ProgramVisitor<'a> {
+    fn visit_program(&mut self, program: &'a Program<'a>);
+}
+
+pub trait MutProgramVisitor<'a> {
+    fn visit_program(&mut self, program: &'a mut Program<'a>);
+}
+
+impl<'a> Program<'a> {
+    pub fn accept<V: ProgramVisitor<'a>>(&'a self, visitor: &mut V) {
+        visitor.visit_program(self);
+    }
+
+    pub fn accept_mut<V: MutProgramVisitor<'a>>(&'a mut self, visitor: &mut V) {
+        visitor.visit_program(self);
     }
 }

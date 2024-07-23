@@ -1,9 +1,8 @@
 mod ast;
 mod ast_printer;
 mod parser;
-mod semantic_analysis;
 mod symbol_table;
-mod type_checking;
+mod semantic_check;
 
 use parser::Parser;
 use typed_arena::Arena;
@@ -20,14 +19,14 @@ fn main() {
     let parser = Parser::new(&stmt_arena, &expr_arena, &str_arena);
 
     match parser.parse(&input) {
-        Ok((_, ast)) => {
+        Ok((_, program)) => {
             let printer = ast_printer::AstPrintVisitor::new();
-            let output = printer.build(&ast);
+            let output = printer.build(&program);
             println!("Ast:\n{}", output);
-            let symbol_table = symbol_table::SymbolTableBuilderVisitor::new().build(&ast);
+            let symbol_table = symbol_table::SymbolTableBuilderVisitor::new(&program).build();
             println!("Symbols:\n{}", symbol_table);
-            let type_checker = type_checking::TypeCheckVisitor::new(&symbol_table);
-            let res = type_checker.check(&ast);
+            let type_checker = semantic_check::SemanticCheckVisitor::new(&symbol_table, &program);
+            let res = type_checker.check();
             println!("Type errors: {:?}", res);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),

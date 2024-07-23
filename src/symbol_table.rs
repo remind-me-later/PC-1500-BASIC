@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Ast, AstVisitor, ExpressionVisitor};
+use crate::ast::{Statement, StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Ty {
@@ -67,18 +67,20 @@ impl std::fmt::Display for SymbolTable<'_> {
 }
 
 pub struct SymbolTableBuilderVisitor<'a> {
+    program: &'a Program<'a>,
     symbol_table: SymbolTable<'a>,
 }
 
 impl<'a> SymbolTableBuilderVisitor<'a> {
-    pub fn new() -> Self {
+    pub fn new(program: &'a Program<'a>) -> Self {
         SymbolTableBuilderVisitor {
+            program,
             symbol_table: SymbolTable::new(),
         }
     }
 
-    pub fn build(mut self, ast: &'a Ast<'a>) -> SymbolTable<'a> {
-        ast.accept(&mut self);
+    pub fn build(mut self) -> SymbolTable<'a> {
+        self.program.accept(&mut self);
         self.symbol_table
     }
 }
@@ -101,7 +103,7 @@ impl<'a> ExpressionVisitor<'a> for SymbolTableBuilderVisitor<'a> {
     }
 }
 
-impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
+impl<'a> StatementVisitor<'a> for SymbolTableBuilderVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &crate::ast::Expression<'a>) {
         self.symbol_table.insert(variable);
         expression.accept(self);
@@ -120,7 +122,7 @@ impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
         self.symbol_table.insert(variable);
     }
 
-    fn visit_goto(&mut self, _: u32, _: Option<&'a Ast<'a>>) {}
+    fn visit_goto(&mut self, _: u32, _: Option<&'a Statement<'a>>) {}
 
     fn visit_for(
         &mut self,
@@ -143,15 +145,15 @@ impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
 
     fn visit_end(&mut self) {}
 
-    fn visit_gosub(&mut self, _: u32, _: Option<&'a Ast<'a>>) {}
+    fn visit_gosub(&mut self, _: u32, _: Option<&'a Statement<'a>>) {}
 
     fn visit_return(&mut self) {}
 
     fn visit_if(
         &mut self,
         condition: &crate::ast::Expression<'a>,
-        then: &'a Ast<'a>,
-        else_: Option<&'a Ast<'a>>,
+        then: &'a Statement<'a>,
+        else_: Option<&'a Statement<'a>>,
     ) {
         condition.accept(self);
         then.accept(self);
@@ -160,14 +162,16 @@ impl<'a> AstVisitor<'a> for SymbolTableBuilderVisitor<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [Ast<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [Statement<'a>]) {
         for statement in statements {
             statement.accept(self);
         }
     }
+}
 
-    fn visit_program(&mut self, lines: &'a std::collections::BTreeMap<u32, Ast<'a>>) {
-        for statement in lines.values() {
+impl<'a> ProgramVisitor<'a> for SymbolTableBuilderVisitor<'a> {
+    fn visit_program(&mut self, program: &'a Program<'a>) {
+        for statement in program.values() {
             statement.accept(self);
         }
     }

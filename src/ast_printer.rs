@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::ast::{AstVisitor, ExpressionVisitor};
+use crate::ast::{StatementVisitor, ExpressionVisitor, Program, ProgramVisitor};
 
 pub struct AstPrintVisitor<'a> {
     indent: usize,
@@ -17,7 +17,7 @@ impl<'a> AstPrintVisitor<'a> {
         }
     }
 
-    pub fn build(self, ast: &'a crate::ast::Ast<'a>) -> String {
+    pub fn build(self, ast: &'a crate::ast::Program<'a>) -> String {
         let mut visitor = AstPrintVisitor::new();
         ast.accept(&mut visitor);
         visitor.output
@@ -56,7 +56,7 @@ impl<'a> ExpressionVisitor<'a> for AstPrintVisitor<'a> {
     }
 }
 
-impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
+impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &crate::ast::Expression<'a>) {
         self.output.push_str("LET ");
         self.output.push_str(variable);
@@ -94,7 +94,7 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
         self.output.push_str(variable);
     }
 
-    fn visit_goto(&mut self, line_number: u32, _: Option<&'a crate::ast::Ast<'a>>) {
+    fn visit_goto(&mut self, line_number: u32, _: Option<&'a crate::ast::Statement<'a>>) {
         self.output.push_str("GOTO ");
         self.output.push_str(&line_number.to_string());
     }
@@ -130,7 +130,7 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
         self.output.push_str("END");
     }
 
-    fn visit_gosub(&mut self, line_number: u32, _: Option<&'a crate::ast::Ast<'a>>) {
+    fn visit_gosub(&mut self, line_number: u32, _: Option<&'a crate::ast::Statement<'a>>) {
         self.output.push_str("GOSUB ");
         self.output.push_str(&line_number.to_string());
     }
@@ -142,8 +142,8 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
     fn visit_if(
         &mut self,
         condition: &crate::ast::Expression<'a>,
-        then: &'a crate::ast::Ast<'a>,
-        else_: Option<&'a crate::ast::Ast<'a>>,
+        then: &'a crate::ast::Statement<'a>,
+        else_: Option<&'a crate::ast::Statement<'a>>,
     ) {
         self.output.push_str("IF ");
         condition.accept(self);
@@ -155,7 +155,7 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [crate::ast::Ast<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [crate::ast::Statement<'a>]) {
         // colon separated list
         for (i, statement) in statements.iter().enumerate() {
             if i > 0 {
@@ -164,9 +164,11 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
             statement.accept(self);
         }
     }
+}
 
-    fn visit_program(&mut self, lines: &'a std::collections::BTreeMap<u32, crate::ast::Ast<'a>>) {
-        for (line_number, ast) in lines {
+impl<'a> ProgramVisitor<'a> for AstPrintVisitor<'a> {
+    fn visit_program(&mut self, program: &'a Program<'a>) {
+        for (line_number, ast) in program.iter() {
             // print line number and then indent
             // 10 LET a = 1
             // 20 FOR i = 1 TO 10

@@ -1,23 +1,27 @@
 use crate::{
-    ast::{Ast, AstVisitor, ExpressionVisitor},
+    ast::{ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor},
     symbol_table::{SymbolTable, Ty},
 };
 
-pub struct TypeCheckVisitor<'a> {
+pub struct SemanticCheckVisitor<'a> {
+    program: &'a Program<'a>,
     errors: Vec<String>,
     symbol_table: &'a SymbolTable<'a>,
+    for_stack: Vec<&'a str>,
 }
 
-impl<'a> TypeCheckVisitor<'a> {
-    pub fn new(symbol_table: &'a SymbolTable<'a>) -> Self {
-        TypeCheckVisitor {
+impl<'a> SemanticCheckVisitor<'a> {
+    pub fn new(symbol_table: &'a SymbolTable<'a>, program: &'a Program<'a>) -> Self {
+        SemanticCheckVisitor {
             errors: Vec::new(),
+            for_stack: Vec::new(),
+            program,
             symbol_table,
         }
     }
 
-    pub fn check(mut self, ast: &'a Ast<'a>) -> Result<(), Vec<String>> {
-        ast.accept(&mut self);
+    pub fn check(mut self) -> Result<(), Vec<String>> {
+        self.program.accept(&mut self);
         if self.errors.is_empty() {
             Ok(())
         } else {
@@ -26,7 +30,7 @@ impl<'a> TypeCheckVisitor<'a> {
     }
 }
 
-impl<'a> ExpressionVisitor<'a, Ty> for TypeCheckVisitor<'a> {
+impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
     fn visit_variable(&mut self, name: &'a str) -> Ty {
         self.symbol_table.lookup(name).unwrap().ty()
     }
@@ -60,7 +64,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for TypeCheckVisitor<'a> {
     }
 }
 
-impl<'a> AstVisitor<'a> for TypeCheckVisitor<'a> {
+impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &crate::ast::Expression<'a>) {
         let expr_ty = expression.accept(self);
         let expected_ty = self.symbol_table.lookup(variable).unwrap().ty();
@@ -85,7 +89,13 @@ impl<'a> AstVisitor<'a> for TypeCheckVisitor<'a> {
 
     fn visit_input(&mut self, _: Option<&str>, _: &'a str) {}
 
-    fn visit_goto(&mut self, _: u32, _: Option<&'a Ast<'a>>) {}
+    fn visit_goto(&mut self, line_number: u32, _: Option<&'a Statement<'a>>) {
+        let to_node = self.program.lookup_line(line_number);
+        if to_node.is_none() {
+            self.errors
+                .push(format!("GOTO to undefined line {}", line_number));
+        }
+    }
 
     fn visit_for(
         &mut self,
@@ -114,6 +124,8 @@ impl<'a> AstVisitor<'a> for TypeCheckVisitor<'a> {
                 self.errors.push("Loop step must be an integer".to_string());
             }
         }
+
+        self.for_stack.push(variable);
     }
 
     fn visit_next(&mut self, variable: &'a str) {
@@ -122,19 +134,38 @@ impl<'a> AstVisitor<'a> for TypeCheckVisitor<'a> {
             self.errors
                 .push("Loop variable must be an integer".to_string());
         }
+
+        if let Some(last) = self.for_stack.pop() {
+            if last != variable {
+                self.errors.push(
+                    "NEXT variable: ".to_string()
+                        + variable
+                        + " does not match FOR variable: "
+                        + last,
+                );
+            }
+        } else {
+            self.errors.push("NEXT without matching FOR".to_string());
+        }
     }
 
     fn visit_end(&mut self) {}
 
-    fn visit_gosub(&mut self, _: u32, _: Option<&'a Ast<'a>>) {}
+    fn visit_gosub(&mut self, line_number: u32, _: Option<&'a Statement<'a>>) {
+        let to_node = self.program.lookup_line(line_number);
+        if to_node.is_none() {
+            self.errors
+                .push(format!("GOSUB to undefined line {}", line_number));
+        }
+    }
 
     fn visit_return(&mut self) {}
 
     fn visit_if(
         &mut self,
         condition: &crate::ast::Expression<'a>,
-        then: &'a Ast<'a>,
-        else_: Option<&'a Ast<'a>>,
+        then: &'a Statement<'a>,
+        else_: Option<&'a Statement<'a>>,
     ) {
         let condition_ty = condition.accept(self);
         if condition_ty != Ty::Int {
@@ -147,14 +178,16 @@ impl<'a> AstVisitor<'a> for TypeCheckVisitor<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [Ast<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [Statement<'a>]) {
         for statement in statements {
             statement.accept(self);
         }
     }
+}
 
-    fn visit_program(&mut self, lines: &'a std::collections::BTreeMap<u32, Ast<'a>>) {
-        for statement in lines.values() {
+impl<'a> ProgramVisitor<'a> for SemanticCheckVisitor<'a> {
+    fn visit_program(&mut self, program: &'a crate::ast::Program<'a>) {
+        for statement in program.values() {
             statement.accept(self);
         }
     }
