@@ -1,4 +1,5 @@
 mod ast;
+mod ast_printer;
 mod parser;
 mod semantic_analysis;
 mod symbol_table;
@@ -20,7 +21,9 @@ fn main() {
 
     match parser.parse(&input) {
         Ok((_, ast)) => {
-            println!("Ast:\n{}", ast);
+            let printer = ast_printer::AstPrintVisitor::new();
+            let output = printer.build(&ast);
+            println!("Ast:\n{}", output);
             let symbol_table = symbol_table::SymbolTableBuilderVisitor::new().build(&ast);
             println!("Symbols:\n{}", symbol_table);
             let type_checker = type_checking::TypeCheckVisitor::new(&symbol_table);
