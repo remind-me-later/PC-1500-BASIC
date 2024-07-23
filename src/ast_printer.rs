@@ -72,7 +72,9 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
             }
             match item {
                 crate::ast::PrintContent::StringLiteral(s) => {
+                    self.output.push('"');
                     self.output.push_str(s);
+                    self.output.push('"');
                 }
                 crate::ast::PrintContent::Expression(expr) => {
                     expr.accept(self);
@@ -84,7 +86,9 @@ impl<'a> AstVisitor<'a> for AstPrintVisitor<'a> {
     fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str) {
         self.output.push_str("INPUT ");
         if let Some(prompt) = prompt {
+            self.output.push('"');
             self.output.push_str(prompt);
+            self.output.push('"');
             self.output.push_str("; ");
         }
         self.output.push_str(variable);
