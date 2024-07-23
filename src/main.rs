@@ -23,6 +23,7 @@ fn main() {
             let printer = ast_printer::AstPrintVisitor::new();
             let output = printer.build(&program);
             println!("Ast:\n{}", output);
+            println!("Debug AST:\n{:#?}", program);
             let symbol_table = symbol_table::SymbolTableBuilderVisitor::new(&program).build();
             println!("Symbols:\n{}", symbol_table);
             let type_checker = semantic_check::SemanticCheckVisitor::new(&symbol_table, &program);

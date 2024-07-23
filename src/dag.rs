@@ -41,7 +41,7 @@ impl std::fmt::Display for BinaryOperator {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash)]
 pub enum Expression<'a> {
     NumberLiteral(i32),
     Variable(&'a str),
@@ -58,6 +58,21 @@ impl std::fmt::Display for Expression<'_> {
             Expression::NumberLiteral(value) => write!(f, "{}", value),
             Expression::Variable(variable) => write!(f, "{}", variable),
             Expression::BinaryOp { left, op, right } => write!(f, "{} {} {}", left, op, right),
+        }
+    }
+}
+
+impl std::fmt::Debug for Expression<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // print also direction
+        match self {
+            Expression::NumberLiteral(value) => {
+                write!(f, "NumberLiteral({})({:p})", value, self)
+            }
+            Expression::Variable(variable) => write!(f, "Variable({})({:p})", variable, self),
+            Expression::BinaryOp { left, op, right } => {
+                write!(f, "BinaryOp({:?}, {:?}, {:?})({:p})", left, op, right, self)
+            }
         }
     }
 }
