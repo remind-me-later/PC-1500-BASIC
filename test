@@ -3,27 +3,35 @@ data:
 
 start:
 	v0 = 10;
-	print *0
-	input *v1
+	param *0
+	call l0
+	param *v1
+	call l1
 	v2 = 1;
-l0:
+l100:
 	v3 = v2 >= v0;
-	if v3 goto l1
-	print *1
-	print *v1
+	if v3 goto l101
+	param *1
+	call l0
+	param *v1
+	call l0
 	v2 = v2 + 1;
-	goto l0
-l1:
+	goto l100
+l101:
 	v4 = 5;
-l2:
+l102:
 	v5 = v4 + 1;
 	v6 = v5 * v5;
 	v4 = v6;
 	v8 = v5 + 1;
 	v7 = v8;
-	print *2
-	print v4
-	print *3
-	print v7
-	goto l2
+	param *2
+	call l0
+	param v4
+	call l0
+	param *3
+	call l0
+	param v7
+	call l0
+	goto l102
 
