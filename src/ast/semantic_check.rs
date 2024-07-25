@@ -1,6 +1,7 @@
-use crate::{
-    dag::{ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor},
+use super::{
     symbol_table::{SymbolTable, Ty},
+    BinaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor, Statement,
+    StatementVisitor,
 };
 
 pub struct SemanticCheckVisitor<'a> {
@@ -41,9 +42,9 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
 
     fn visit_binary_op(
         &mut self,
-        left: &crate::dag::Expression<'a>,
-        _: crate::dag::BinaryOperator,
-        right: &crate::dag::Expression<'a>,
+        left: &Expression<'a>,
+        _: BinaryOperator,
+        right: &Expression<'a>,
     ) -> Ty {
         let left_ty = left.accept(self);
         let right_ty = right.accept(self);
@@ -65,7 +66,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &crate::dag::Expression<'a>) {
+    fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>) {
         let expr_ty = expression.accept(self);
         let expected_ty = self.symbol_table.lookup(variable).unwrap().ty();
         if expr_ty != expected_ty {
@@ -76,11 +77,11 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
         }
     }
 
-    fn visit_print(&mut self, content: &[crate::dag::PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &[super::PrintContent<'a>]) {
         for item in content {
             match item {
-                crate::dag::PrintContent::StringLiteral(_) => {}
-                crate::dag::PrintContent::Expression(expr) => {
+                super::PrintContent::StringLiteral(_) => {}
+                super::PrintContent::Expression(expr) => {
                     expr.accept(self);
                 }
             }
@@ -89,7 +90,7 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
 
     fn visit_input(&mut self, _: Option<&str>, _: &'a str) {}
 
-    fn visit_goto(&mut self, line_number: u32, _: Option<&'a Statement<'a>>) {
+    fn visit_goto(&mut self, line_number: u32) {
         let to_node = self.program.lookup_line(line_number);
         if to_node.is_none() {
             self.errors
@@ -100,9 +101,9 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &crate::dag::Expression<'a>,
-        to: &crate::dag::Expression<'a>,
-        step: Option<&crate::dag::Expression<'a>>,
+        from: &Expression<'a>,
+        to: &Expression<'a>,
+        step: Option<&Expression<'a>>,
     ) {
         let var_ty = self.symbol_table.lookup(variable).unwrap().ty();
 
@@ -151,7 +152,7 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
 
     fn visit_end(&mut self) {}
 
-    fn visit_gosub(&mut self, line_number: u32, _: Option<&'a Statement<'a>>) {
+    fn visit_gosub(&mut self, line_number: u32) {
         let to_node = self.program.lookup_line(line_number);
         if to_node.is_none() {
             self.errors
@@ -163,7 +164,7 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
 
     fn visit_if(
         &mut self,
-        condition: &crate::dag::Expression<'a>,
+        condition: &Expression<'a>,
         then: &'a Statement<'a>,
         else_: Option<&'a Statement<'a>>,
     ) {
@@ -186,7 +187,7 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
 }
 
 impl<'a> ProgramVisitor<'a> for SemanticCheckVisitor<'a> {
-    fn visit_program(&mut self, program: &'a crate::dag::Program<'a>) {
+    fn visit_program(&mut self, program: &'a super::Program<'a>) {
         for statement in program.values() {
             statement.accept(self);
         }

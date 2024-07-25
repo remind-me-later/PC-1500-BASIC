@@ -1,11 +1,11 @@
-mod ast_printer;
-mod dag;
-mod parser;
-mod semantic_check;
-mod symbol_table;
-mod tac;
+mod ast;
+mod hir;
 
-use parser::Parser;
+use ast::AstPrintVisitor;
+use ast::Parser;
+use ast::SemanticCheckVisitor;
+use ast::SymbolTableBuilderVisitor;
+use hir::HirBuilder;
 use typed_arena::Arena;
 
 // TODO: use clap for argument parsing
@@ -21,15 +21,16 @@ fn main() {
 
     match parser.parse(&input) {
         Ok((_, program)) => {
-            let printer = ast_printer::AstPrintVisitor::new();
+            let printer = AstPrintVisitor::new();
             let output = printer.build(&program);
             println!("Ast:\n{}", output);
-            println!("Debug AST:\n{:#?}", program);
-            let symbol_table = symbol_table::SymbolTableBuilderVisitor::new(&program).build();
+            let symbol_table = SymbolTableBuilderVisitor::new(&program).build();
             println!("Symbols:\n{}", symbol_table);
-            let type_checker = semantic_check::SemanticCheckVisitor::new(&symbol_table, &program);
+            let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
             let res = type_checker.check();
             println!("Type errors: {:?}", res);
+            let hir = HirBuilder::new(&program).build();
+            println!("Hir:\n{}", hir);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }

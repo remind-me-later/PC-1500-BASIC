@@ -1,4 +1,4 @@
-use crate::dag::{BinaryOperator, Expression, PrintContent, Program, Statement};
+use super::{BinaryOperator, Expression, PrintContent, Program, Statement};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
@@ -341,13 +341,7 @@ impl<'parser> Parser<'parser> {
         let (input, _) = space1(input)?;
         let (input, line_number) = Self::parse_line_number(input)?;
 
-        Ok((
-            input,
-            Statement::Goto {
-                line_number,
-                to: None,
-            },
-        ))
+        Ok((input, Statement::Goto { line_number }))
     }
 
     fn parse_gosub<'input>(
@@ -358,13 +352,7 @@ impl<'parser> Parser<'parser> {
         let (input, _) = space1(input)?;
         let (input, line_number) = Self::parse_line_number(input)?;
 
-        Ok((
-            input,
-            Statement::GoSub {
-                line_number,
-                to: None,
-            },
-        ))
+        Ok((input, Statement::GoSub { line_number }))
     }
 
     fn parse_return<'input>(

@@ -1,5 +1,15 @@
 use std::collections::BTreeMap;
 
+mod ast_printer;
+mod parser;
+mod semantic_check;
+mod symbol_table;
+
+pub use ast_printer::AstPrintVisitor;
+pub use parser::Parser;
+pub use semantic_check::SemanticCheckVisitor;
+pub use symbol_table::{SymbolTable, SymbolTableBuilderVisitor, Ty};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
     // Arithmetic
@@ -116,12 +126,10 @@ pub enum Statement<'a> {
     },
     Goto {
         line_number: u32,
-        to: Option<&'a mut Statement<'a>>,
     },
     End,
     GoSub {
         line_number: u32,
-        to: Option<&'a mut Statement<'a>>,
     },
     Return,
     If {
@@ -188,17 +196,17 @@ pub trait StatementVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>);
     fn visit_print(&mut self, content: &[PrintContent<'a>]);
     fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str);
-    fn visit_goto(&mut self, line_number: u32, to: Option<&'a Statement<'a>>);
+    fn visit_goto(&mut self, line_number: u32);
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &Expression<'a>,
-        to: &Expression<'a>,
-        step: Option<&Expression<'a>>,
+        from: &'a Expression<'a>,
+        to: &'a Expression<'a>,
+        step: Option<&'a Expression<'a>>,
     );
     fn visit_next(&mut self, variable: &'a str);
     fn visit_end(&mut self);
-    fn visit_gosub(&mut self, line_number: u32, to: Option<&'a Statement<'a>>);
+    fn visit_gosub(&mut self, line_number: u32);
     fn visit_return(&mut self);
     fn visit_if(
         &mut self,
@@ -220,7 +228,7 @@ impl<'a> Statement<'a> {
             Statement::Input { prompt, variable } => {
                 visitor.visit_input(prompt.as_deref(), variable)
             }
-            Statement::Goto { line_number, to } => visitor.visit_goto(*line_number, to.as_deref()),
+            Statement::Goto { line_number } => visitor.visit_goto(*line_number),
             Statement::For {
                 variable,
                 from,
@@ -229,9 +237,7 @@ impl<'a> Statement<'a> {
             } => visitor.visit_for(variable, from, to, *step),
             Statement::Next { variable } => visitor.visit_next(variable),
             Statement::End => visitor.visit_end(),
-            Statement::GoSub { line_number, to } => {
-                visitor.visit_gosub(*line_number, to.as_deref())
-            }
+            Statement::GoSub { line_number } => visitor.visit_gosub(*line_number),
             Statement::Return => visitor.visit_return(),
             Statement::If {
                 condition,
