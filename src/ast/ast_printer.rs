@@ -1,9 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{
-    Expression, ExpressionVisitor, PrintContent, Program, ProgramVisitor, Statement,
-    StatementVisitor,
-};
+use super::{Expression, ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor};
 
 pub struct AstPrintVisitor<'a> {
     indent: usize,
@@ -57,6 +54,12 @@ impl<'a> ExpressionVisitor<'a> for AstPrintVisitor<'a> {
         right.accept(self);
         self.output.push(')');
     }
+
+    fn visit_string_literal(&mut self, content: &'a str) {
+        self.output.push('"');
+        self.output.push_str(content);
+        self.output.push('"');
+    }
 }
 
 impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
@@ -67,30 +70,21 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
         expression.accept(self);
     }
 
-    fn visit_print(&mut self, content: &[PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]) {
         self.output.push_str("PRINT ");
         for (i, item) in content.iter().enumerate() {
             if i > 0 {
                 self.output.push_str("; ");
             }
-            match item {
-                PrintContent::StringLiteral(s) => {
-                    self.output.push('"');
-                    self.output.push_str(s);
-                    self.output.push('"');
-                }
-                PrintContent::Expression(expr) => {
-                    expr.accept(self);
-                }
-            }
+            item.accept(self);
         }
     }
 
-    fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str) {
+    fn visit_input(&mut self, prompt: Option<&'a Expression<'a>>, variable: &'a str) {
         self.output.push_str("INPUT ");
         if let Some(prompt) = prompt {
             self.output.push('"');
-            self.output.push_str(prompt);
+            prompt.accept(self);
             self.output.push('"');
             self.output.push_str("; ");
         }

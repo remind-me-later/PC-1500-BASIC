@@ -54,6 +54,7 @@ impl std::fmt::Display for BinaryOperator {
 #[derive(PartialEq, Eq, Hash)]
 pub enum Expression<'a> {
     NumberLiteral(i32),
+    StringLiteral(&'a str),
     Variable(&'a str),
     BinaryOp {
         left: &'a Expression<'a>,
@@ -65,6 +66,7 @@ pub enum Expression<'a> {
 impl std::fmt::Display for Expression<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Expression::StringLiteral(content) => write!(f, "\"{}\"", content),
             Expression::NumberLiteral(value) => write!(f, "{}", value),
             Expression::Variable(variable) => write!(f, "{}", variable),
             Expression::BinaryOp { left, op, right } => write!(f, "{} {} {}", left, op, right),
@@ -76,6 +78,9 @@ impl std::fmt::Debug for Expression<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // print also direction
         match self {
+            Expression::StringLiteral(content) => {
+                write!(f, "StringLiteral(\"{}\")({:p})", content, self)
+            }
             Expression::NumberLiteral(value) => {
                 write!(f, "NumberLiteral({})({:p})", value, self)
             }
@@ -88,31 +93,16 @@ impl std::fmt::Debug for Expression<'_> {
 }
 
 #[derive(Debug)]
-pub enum PrintContent<'a> {
-    StringLiteral(&'a str),
-    Expression(&'a Expression<'a>),
-}
-
-impl std::fmt::Display for PrintContent<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PrintContent::StringLiteral(content) => write!(f, "\"{}\"", content),
-            PrintContent::Expression(expr) => write!(f, "{}", expr),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub enum Statement<'a> {
     Let {
         variable: &'a str,
         expression: &'a Expression<'a>,
     },
     Print {
-        content: Vec<PrintContent<'a>>,
+        content: Vec<&'a Expression<'a>>,
     },
     Input {
-        prompt: Option<&'a str>,
+        prompt: Option<&'a Expression<'a>>,
         variable: &'a str,
     },
     For {
@@ -173,6 +163,7 @@ impl<'a> Program<'a> {
 
 pub trait ExpressionVisitor<'a, RetTy = ()> {
     fn visit_number_literal(&mut self, num: i32) -> RetTy;
+    fn visit_string_literal(&mut self, content: &'a str) -> RetTy;
     fn visit_variable(&mut self, variable: &'a str) -> RetTy;
     fn visit_binary_op(
         &mut self,
@@ -186,6 +177,7 @@ impl<'a> Expression<'a> {
     pub fn accept<V: ExpressionVisitor<'a, RetTy>, RetTy>(&self, visitor: &mut V) -> RetTy {
         match self {
             Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
+            Expression::StringLiteral(content) => visitor.visit_string_literal(content),
             Expression::Variable(variable) => visitor.visit_variable(variable),
             Expression::BinaryOp { left, op, right } => visitor.visit_binary_op(left, *op, right),
         }
@@ -194,8 +186,8 @@ impl<'a> Expression<'a> {
 
 pub trait StatementVisitor<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>);
-    fn visit_print(&mut self, content: &[PrintContent<'a>]);
-    fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str);
+    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]);
+    fn visit_input(&mut self, prompt: Option<&'a Expression<'a>>, variable: &'a str);
     fn visit_goto(&mut self, line_number: u32);
     fn visit_for(
         &mut self,
@@ -224,7 +216,7 @@ impl<'a> Statement<'a> {
                 variable,
                 expression,
             } => visitor.visit_let(variable, expression),
-            Statement::Print { content } => visitor.visit_print(content),
+            Statement::Print { content } => visitor.visit_print(content.as_slice()),
             Statement::Input { prompt, variable } => {
                 visitor.visit_input(prompt.as_deref(), variable)
             }

@@ -63,6 +63,10 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
 
         Ty::Int
     }
+
+    fn visit_string_literal(&mut self, _: &'a str) -> Ty {
+        Ty::String
+    }
 }
 
 impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
@@ -77,18 +81,15 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
         }
     }
 
-    fn visit_print(&mut self, content: &[super::PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]) {
         for item in content {
-            match item {
-                super::PrintContent::StringLiteral(_) => {}
-                super::PrintContent::Expression(expr) => {
-                    expr.accept(self);
-                }
-            }
+            item.accept(self);
         }
     }
 
-    fn visit_input(&mut self, _: Option<&str>, _: &'a str) {}
+    fn visit_input(&mut self, _: Option<&Expression<'a>>, _: &'a str) {
+        // TODO: check prompt is string? Are integer prompts allowed?
+    }
 
     fn visit_goto(&mut self, line_number: u32) {
         let to_node = self.program.lookup_line(line_number);

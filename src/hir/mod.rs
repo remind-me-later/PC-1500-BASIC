@@ -46,21 +46,24 @@ impl std::fmt::Display for BinaryOperator {
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Operand {
     Variable { id: u32 },
+    IndirectVariable { id: u32 },
+
     NumberLiteral { value: i32 },
+    IndirectNumberLiteral { value: i32 },
 }
 
 impl Operand {
     pub fn variable_id(&self) -> Option<u32> {
         match self {
             Operand::Variable { id } => Some(*id),
-            Operand::NumberLiteral { .. } => None,
+            _ => None,
         }
     }
 
     pub fn number_literal_value(&self) -> Option<i32> {
         match self {
-            Operand::Variable { .. } => None,
             Operand::NumberLiteral { value } => Some(*value),
+            _ => None,
         }
     }
 }
@@ -70,6 +73,8 @@ impl std::fmt::Display for Operand {
         match self {
             Operand::Variable { id } => write!(f, "V{}", id),
             Operand::NumberLiteral { value } => write!(f, "{}", value),
+            Operand::IndirectVariable { id } => write!(f, "[V{}]", id),
+            Operand::IndirectNumberLiteral { value } => write!(f, "[{}]", value),
         }
     }
 }
@@ -102,9 +107,7 @@ pub enum Hir {
     Return,
     If { condition: Operand, label: u32 },
     // intrinsics
-    PrintIndirect { operand: Operand },
-    PrintOperand { operand: Operand },
-
+    Print { operand: Operand },
     Input { dest: Operand },
 }
 
@@ -118,8 +121,7 @@ impl std::fmt::Display for Hir {
             Hir::Label { id } => write!(f, "L{}:", id),
             Hir::Return => write!(f, "RETURN"),
             Hir::If { condition, label } => write!(f, "IF {} GOTO L{}", condition, label),
-            Hir::PrintIndirect { operand } => write!(f, "PRINT *{}", operand),
-            Hir::PrintOperand { operand } => write!(f, "PRINT {}", operand),
+            Hir::Print { operand } => write!(f, "PRINT {}", operand),
             Hir::Input { dest } => write!(f, "INPUT {}", dest),
         }
     }
@@ -156,8 +158,8 @@ pub struct HirBuilder<'a> {
 
     program: &'a ast::Program<'a>,
 
-    var_map: HashMap<*const str, u32>,
-    expr_map: HashMap<*const ast::Expression<'a>, u32>,
+    var_map: HashMap<*const str, Operand>,
+    expr_map: HashMap<*const ast::Expression<'a>, Operand>,
 
     str_map: HashMap<*const str, usize>,
     str_literals: Vec<String>,
@@ -224,13 +226,28 @@ impl<'a> ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
         Operand::NumberLiteral { value }
     }
 
+    fn visit_string_literal(&mut self, content: &'a str) -> Operand {
+        let index = self.insert_str_literal(content);
+        Operand::IndirectNumberLiteral {
+            value: index as i32,
+        }
+    }
+
     fn visit_variable(&mut self, variable: &'a str) -> Operand {
         if let Some(&id) = self.var_map.get(&ptr::from_ref(variable)) {
-            Operand::Variable { id }
+            id
         } else {
             let id = self.get_next_variable_id();
-            self.var_map.insert(variable as *const str, id);
-            Operand::Variable { id }
+
+            let var = if variable.trim().ends_with("$") {
+                Operand::IndirectVariable { id }
+            } else {
+                Operand::Variable { id }
+            };
+
+            self.var_map.insert(ptr::from_ref(variable), var);
+
+            var
         }
     }
 
@@ -241,27 +258,22 @@ impl<'a> ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
         right: &'a ast::Expression<'a>,
     ) -> Operand {
         let left_op = if let Some(&id) = self.expr_map.get(&ptr::from_ref(left)) {
-            Operand::Variable { id }
+            id
         } else {
             let dest = left.accept(self);
-            match dest {
-                Operand::Variable { id } => self.expr_map.insert(ptr::from_ref(left), id),
-                Operand::NumberLiteral { .. } => None,
-            };
+            self.expr_map.insert(ptr::from_ref(left), dest);
             dest
         };
 
         let right_op = if let Some(&id) = self.expr_map.get(&ptr::from_ref(right)) {
-            Operand::Variable { id }
+            id
         } else {
             let dest = right.accept(self);
-            match dest {
-                Operand::Variable { id } => self.expr_map.insert(ptr::from_ref(right), id),
-                Operand::NumberLiteral { .. } => None,
-            };
+            self.expr_map.insert(ptr::from_ref(right), dest);
             dest
         };
 
+        // TODO: if string concatenation is allowed this has to change
         let dest_op = Operand::Variable {
             id: self.get_next_variable_id(),
         };
@@ -342,8 +354,7 @@ impl<'a> ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
         };
 
         self.hir.push(Hir::Expression(expr));
-        self.expr_map
-            .insert(ptr::from_ref(left), dest_op.variable_id().unwrap());
+        self.expr_map.insert(ptr::from_ref(left), dest_op);
 
         dest_op
     }
@@ -357,32 +368,17 @@ impl<'a> StatementVisitor<'a> for HirBuilder<'a> {
         self.hir.push(Hir::Copy { src, dest });
     }
 
-    fn visit_print(&mut self, content: &[ast::PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &'a [&'a ast::Expression<'a>]) {
         for item in content {
-            match item {
-                ast::PrintContent::StringLiteral(s) => {
-                    let id = self.insert_str_literal(s);
-                    self.hir.push(Hir::PrintIndirect {
-                        operand: Operand::NumberLiteral { value: id as i32 },
-                    });
-                }
-                ast::PrintContent::Expression(expr) => {
-                    let operand = expr.accept(self);
-                    self.hir.push(Hir::PrintOperand { operand });
-                }
-            }
+            let operand = item.accept(self);
+            self.hir.push(Hir::Print { operand });
         }
     }
 
-    fn visit_input(&mut self, prompt: Option<&str>, variable: &'a str) {
+    fn visit_input(&mut self, prompt: Option<&'a ast::Expression<'a>>, variable: &'a str) {
         if let Some(prompt) = prompt {
-            let prompt = self.insert_str_literal(prompt);
-
-            self.hir.push(Hir::PrintIndirect {
-                operand: Operand::NumberLiteral {
-                    value: prompt as i32,
-                },
-            });
+            let prompt = prompt.accept(self);
+            self.hir.push(Hir::Print { operand: prompt });
         }
 
         let dest = self.visit_variable(variable);

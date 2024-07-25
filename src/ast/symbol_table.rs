@@ -1,7 +1,4 @@
-use super::{
-    Expression, ExpressionVisitor, PrintContent, Program, ProgramVisitor, Statement,
-    StatementVisitor,
-};
+use super::{Expression, ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor};
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -14,7 +11,7 @@ impl std::fmt::Display for Ty {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Ty::Int => write!(f, "INT"),
-            Ty::String => write!(f, "STRING"),
+            Ty::String => write!(f, "STR"),
         }
     }
 }
@@ -103,6 +100,8 @@ impl<'a> ExpressionVisitor<'a> for SymbolTableBuilderVisitor<'a> {
         left.accept(self);
         right.accept(self);
     }
+
+    fn visit_string_literal(&mut self, _: &'a str) {}
 }
 
 impl<'a> StatementVisitor<'a> for SymbolTableBuilderVisitor<'a> {
@@ -111,16 +110,16 @@ impl<'a> StatementVisitor<'a> for SymbolTableBuilderVisitor<'a> {
         expression.accept(self);
     }
 
-    fn visit_print(&mut self, content: &[PrintContent<'a>]) {
+    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]) {
         for item in content {
-            match item {
-                PrintContent::StringLiteral(_) => {}
-                PrintContent::Expression(expr) => expr.accept(self),
-            }
+            item.accept(self);
         }
     }
 
-    fn visit_input(&mut self, _: Option<&str>, variable: &'a str) {
+    fn visit_input(&mut self, prompt: Option<&Expression<'a>>, variable: &'a str) {
+        if let Some(prompt) = prompt {
+            prompt.accept(self);
+        }
         self.symbol_table.insert(variable);
     }
 

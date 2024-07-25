@@ -1,4 +1,4 @@
-use super::{BinaryOperator, Expression, PrintContent, Program, Statement};
+use super::{BinaryOperator, Expression, Program, Statement};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
@@ -63,6 +63,16 @@ impl<'parser> Parser<'parser> {
         map_res(digit1, i32::from_str)(input)
     }
 
+    fn parse_string_literal<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, &'parser str> {
+        let (input, content) =
+            delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""))(input)?;
+
+        Ok((input, self.get_str(content)))
+    }
+
     // variables are sequences of alphabetic characters, optionally followed by a dollar sign, to indicate a string variable
     fn parse_variable<'input>(
         &'parser self,
@@ -83,6 +93,10 @@ impl<'parser> Parser<'parser> {
             map(
                 move |i| self.parse_variable(i),
                 |i| self.get_expr(Expression::Variable(i)),
+            ),
+            map(
+                move |i| self.parse_string_literal(i),
+                |i| self.get_expr(Expression::StringLiteral(i)),
             ),
             move |i| self.parse_parens_expression(i),
         ))(input)?;
@@ -272,16 +286,6 @@ impl<'parser> Parser<'parser> {
         ))
     }
 
-    fn parse_string_literal<'input>(
-        &'parser self,
-        input: &'input str,
-    ) -> IResult<&'input str, &'parser str> {
-        let (input, content) =
-            delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""))(input)?;
-
-        Ok((input, self.get_str(content)))
-    }
-
     fn parse_print<'input>(
         &'parser self,
         input: &'input str,
@@ -293,13 +297,7 @@ impl<'parser> Parser<'parser> {
         let (input, content) = separated_list1(
             // semi-colon followed by optional whitespace
             delimited(tag(";"), multispace0, multispace0),
-            alt((
-                map(
-                    move |i| self.parse_string_literal(i),
-                    PrintContent::StringLiteral,
-                ),
-                map(move |i| self.parse_expression(i), PrintContent::Expression),
-            )),
+            move |i| self.parse_expression(i),
         )(input)?;
 
         Ok((input, Statement::Print { content }))
@@ -314,23 +312,13 @@ impl<'parser> Parser<'parser> {
         let (input, _) = space1(input)?;
 
         // get optional prompt
-        let (input, prompt) = opt(delimited(
-            tag("\""),
-            take_while(|c: char| c != '"'),
-            tag("\""),
-        ))(input)?;
+        let (input, prompt) = opt(move |i| self.parse_expression(i))(input)?;
 
         // if a promtp was found, skip the semicolon and optional whitespace
         let (input, _) = opt(delimited(tag(";"), multispace0, multispace0))(input)?;
         let (input, variable) = self.parse_variable(input)?;
 
-        Ok((
-            input,
-            Statement::Input {
-                prompt: prompt.map(|s| self.get_str(s)),
-                variable,
-            },
-        ))
+        Ok((input, Statement::Input { prompt, variable }))
     }
 
     fn parse_goto<'input>(
