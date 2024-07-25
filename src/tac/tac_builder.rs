@@ -2,11 +2,11 @@ use std::{collections::HashMap, ptr};
 
 use crate::{
     ast::{self, ExpressionVisitor},
-    hir::{INPUT_PTR_LABEL, PRINT_PTR_LABEL},
+    tac::{EXIT_LABEL, INPUT_PTR_LABEL, PRINT_PTR_LABEL},
 };
 
 use super::{
-    BinaryOperator, Expression, Hir, IfCondition, Operand, Program, END_OF_BUILTIN_LABELS,
+    BinaryOperator, Expression, IfCondition, Operand, Program, Tac, END_OF_BUILTIN_LABELS,
     INPUT_VAL_LABEL, PRINT_VAL_LABEL,
 };
 
@@ -17,7 +17,7 @@ struct ForInfo<'a> {
 }
 
 pub struct HirBuilder<'a> {
-    hir: Vec<Hir>,
+    hir: Vec<Tac>,
 
     program: &'a ast::Program<'a>,
 
@@ -216,7 +216,7 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
             },
         };
 
-        self.hir.push(Hir::Expression(expr));
+        self.hir.push(Tac::Expression(expr));
         self.expr_map.insert(ptr::from_ref(left), dest_op);
 
         dest_op
@@ -228,23 +228,23 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         let dest = self.visit_variable(variable);
         let src = expression.accept(self);
 
-        self.hir.push(Hir::Copy { src, dest });
+        self.hir.push(Tac::Copy { src, dest });
     }
 
     fn visit_print(&mut self, content: &'a [&'a ast::Expression<'a>]) {
         // TODO: maybe print all together? How?
         for item in content {
             let operand = item.accept(self);
-            self.hir.push(Hir::Param { operand });
+            self.hir.push(Tac::Param { operand });
 
             match operand {
                 Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
-                    self.hir.push(Hir::Call {
+                    self.hir.push(Tac::Call {
                         label: PRINT_VAL_LABEL,
                     });
                 }
                 Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
-                    self.hir.push(Hir::Call {
+                    self.hir.push(Tac::Call {
                         label: PRINT_PTR_LABEL,
                     });
                 }
@@ -255,16 +255,16 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
     fn visit_input(&mut self, prompt: Option<&'a ast::Expression<'a>>, variable: &'a str) {
         if let Some(prompt) = prompt {
             let prompt = prompt.accept(self);
-            self.hir.push(Hir::Param { operand: prompt });
+            self.hir.push(Tac::Param { operand: prompt });
 
             match prompt {
                 Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
-                    self.hir.push(Hir::Call {
+                    self.hir.push(Tac::Call {
                         label: PRINT_VAL_LABEL,
                     });
                 }
                 Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
-                    self.hir.push(Hir::Call {
+                    self.hir.push(Tac::Call {
                         label: PRINT_PTR_LABEL,
                     });
                 }
@@ -272,16 +272,16 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         }
 
         let dest = self.visit_variable(variable);
-        self.hir.push(Hir::Param { operand: dest });
+        self.hir.push(Tac::Param { operand: dest });
 
         match dest {
             Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
-                self.hir.push(Hir::Call {
+                self.hir.push(Tac::Call {
                     label: INPUT_VAL_LABEL,
                 });
             }
             Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
-                self.hir.push(Hir::Call {
+                self.hir.push(Tac::Call {
                     label: INPUT_PTR_LABEL,
                 });
             }
@@ -291,7 +291,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
     fn visit_goto(&mut self, line_number: u32) {
         self.goto_list.push(self.hir.len());
 
-        self.hir.push(Hir::Goto { label: line_number });
+        self.hir.push(Tac::Goto { label: line_number });
     }
 
     fn visit_for(
@@ -303,7 +303,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
     ) {
         let index = self.visit_variable(variable);
         let from = from.accept(self);
-        self.hir.push(Hir::Copy {
+        self.hir.push(Tac::Copy {
             src: from,
             dest: index,
         });
@@ -316,11 +316,11 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
             step,
         };
 
-        self.hir.push(Hir::Label {
+        self.hir.push(Tac::Label {
             id: info.begin_label,
         });
 
-        self.hir.push(Hir::If {
+        self.hir.push(Tac::If {
             condition: IfCondition {
                 left: index,
                 op: BinaryOperator::Ge,
@@ -338,7 +338,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
         if let Some(step) = info.step {
             let step = step.accept(self);
-            self.hir.push(Hir::Expression(Expression {
+            self.hir.push(Tac::Expression(Expression {
                 left: index,
                 op: BinaryOperator::Add,
                 right: step,
@@ -346,7 +346,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
             }));
         } else {
             // Add 1 to the index variable
-            self.hir.push(Hir::Expression(Expression {
+            self.hir.push(Tac::Expression(Expression {
                 left: index,
                 op: BinaryOperator::Add,
                 right: Operand::NumberLiteral { value: 1 },
@@ -354,22 +354,24 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
             }));
         }
 
-        self.hir.push(Hir::Goto {
+        self.hir.push(Tac::Goto {
             label: info.begin_label,
         });
-        self.hir.push(Hir::Label { id: info.end_label });
+        self.hir.push(Tac::Label { id: info.end_label });
     }
 
-    fn visit_end(&mut self) {}
+    fn visit_end(&mut self) {
+        self.hir.push(Tac::Call { label: EXIT_LABEL });
+    }
 
     fn visit_gosub(&mut self, line_number: u32) {
         self.goto_list.push(self.hir.len());
 
-        self.hir.push(Hir::Call { label: line_number });
+        self.hir.push(Tac::Call { label: line_number });
     }
 
     fn visit_return(&mut self) {
-        self.hir.push(Hir::Return);
+        self.hir.push(Tac::Return);
     }
 
     fn visit_if(
@@ -386,14 +388,18 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
         let label = self.get_next_label();
 
-        self.hir.push(Hir::If { condition, label });
+        self.hir.push(Tac::If { condition, label });
 
         then.accept(self);
 
-        self.hir.push(Hir::Label { id: label });
-
         if let Some(else_) = else_ {
+            let else_label = self.get_next_label();
+            self.hir.push(Tac::Goto { label: else_label });
+            self.hir.push(Tac::Label { id: label });
             else_.accept(self);
+            self.hir.push(Tac::Label { id: else_label });
+        } else {
+            self.hir.push(Tac::Label { id: label });
         }
     }
 
@@ -420,7 +426,7 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
             // TODO: check there is already a label
             let new_label = {
                 let line = match &self.hir[goto_idx] {
-                    Hir::Goto { label: line } | Hir::Call { label: line } => *line as usize,
+                    Tac::Goto { label: line } | Tac::Call { label: line } => *line as usize,
                     _ => unreachable!("Invalid goto position: {}", self.hir[goto_idx]),
                 };
 
@@ -428,7 +434,7 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
                 let new_label_pos = *self.line_to_hir_map.get(&line).unwrap();
                 let new_label = self.get_next_label();
 
-                self.hir.insert(new_label_pos, Hir::Label { id: new_label });
+                self.hir.insert(new_label_pos, Tac::Label { id: new_label });
 
                 for j in i..self.goto_list.len() {
                     if self.goto_list[j] >= new_label_pos {
@@ -442,8 +448,8 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
             let goto_idx = self.goto_list[i];
 
             match &self.hir[goto_idx] {
-                Hir::Goto { .. } => self.hir[goto_idx] = Hir::Goto { label: new_label },
-                Hir::Call { .. } => self.hir[goto_idx] = Hir::Call { label: new_label },
+                Tac::Goto { .. } => self.hir[goto_idx] = Tac::Goto { label: new_label },
+                Tac::Call { .. } => self.hir[goto_idx] = Tac::Call { label: new_label },
                 _ => unreachable!("Invalid goto position: {}", self.hir[goto_idx]),
             }
 

@@ -1,43 +1,50 @@
 data:
-["What is your name? ", "Hello, ", "X = ", "Y = "]
+["What is your name? ", "STOP", "Hello, ", "X = ", "Y = "]
 
 start:
 	v0 := 1
 	v1 := 1
-	call l22
+	call l24
 	v2 := 10
 	param *0
 	call print_ptr
 	param *v3
 	call input_ptr
-	v4 := 1
+	v4 := *v3 == *1
+	if v4 != 0 goto l20
+	call exit
+	goto l21
 l20:
-	if v4 >= v2 goto l21
-	param *1
+	v0 := 99
+l21:
+	v5 := 1
+l22:
+	if v5 >= v2 goto l23
+	param *2
 	call print_ptr
 	param *v3
 	call print_ptr
-	v4 := v4 + 1
-	goto l20
-l21:
-	goto l23
-	v0 := 5
-l24:
-	v5 := v0 + 1
-	v6 := v5 * v5
-	v0 := v6
+	v5 := v5 + 2
+	goto l22
 l23:
-	v7 := v5 + 1
-	v1 := v7
-l22:
-	param *2
+	goto l25
+	v0 := 5
+l26:
+	v6 := v0 + 1
+	v7 := v6 * v6
+	v0 := v7
+l25:
+	v8 := v6 + 1
+	v1 := v8
+l24:
+	param *3
 	call print_ptr
 	param v0
 	call print_val
-	param *3
+	param *4
 	call print_ptr
 	param v1
 	call print_val
 	return
-	goto l24
+	goto l26
 

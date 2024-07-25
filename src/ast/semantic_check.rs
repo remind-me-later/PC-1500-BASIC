@@ -43,7 +43,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
     fn visit_binary_op(
         &mut self,
         left: &Expression<'a>,
-        _: BinaryOperator,
+        op: BinaryOperator,
         right: &Expression<'a>,
     ) -> Ty {
         let left_ty = left.accept(self);
@@ -56,9 +56,27 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
             ));
         }
 
-        if left_ty == Ty::String {
-            self.errors
-                .push("Cannot perform arithmetic on strings".to_string());
+        match op {
+            BinaryOperator::Add
+            | BinaryOperator::Sub
+            | BinaryOperator::Mul
+            | BinaryOperator::Div
+            | BinaryOperator::And
+            | BinaryOperator::Or => {
+                if left_ty != Ty::Int {
+                    self.errors
+                        .push("Arithmetic operands must be integers".to_string());
+                }
+            }
+            BinaryOperator::Eq
+            | BinaryOperator::Ne
+            | BinaryOperator::Lt
+            | BinaryOperator::Le
+            | BinaryOperator::Gt
+            | BinaryOperator::Ge => {
+                // Itegers and string are comparable
+                // in the case of strings, the comparison is lexicographical
+            }
         }
 
         Ty::Int

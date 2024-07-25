@@ -1,11 +1,12 @@
 mod ast;
-mod hir;
+mod tac;
+mod ssa;
 
 // use ast::AstPrintVisitor;
 use ast::Parser;
 use ast::SemanticCheckVisitor;
 use ast::SymbolTableBuilderVisitor;
-use hir::HirBuilder;
+use tac::HirBuilder;
 use typed_arena::Arena;
 
 // TODO: use clap for argument parsing

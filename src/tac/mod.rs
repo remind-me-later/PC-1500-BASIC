@@ -1,6 +1,6 @@
-mod hir_builder;
+mod tac_builder;
 
-pub use hir_builder::HirBuilder;
+pub use tac_builder::HirBuilder;
 
 pub const BEGIN_OF_BUILTIN_LABELS: u32 = 0;
 pub const END_OF_BUILTIN_LABELS: u32 = 20;
@@ -8,6 +8,7 @@ pub const PRINT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS;
 pub const INPUT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 1;
 pub const PRINT_VAL_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 2;
 pub const INPUT_VAL_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 3;
+pub const EXIT_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
@@ -117,7 +118,7 @@ impl std::fmt::Display for IfCondition {
     }
 }
 
-pub enum Hir {
+pub enum Tac {
     Expression(Expression),
     Copy { src: Operand, dest: Operand },
     // Control flow
@@ -130,36 +131,37 @@ pub enum Hir {
     Param { operand: Operand },
 }
 
-impl std::fmt::Display for Hir {
+impl std::fmt::Display for Tac {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Hir::Copy { src, dest } => write!(f, "{} := {}", dest, src),
-            Hir::Expression(expr) => write!(f, "{}", expr),
-            Hir::Goto { label } => write!(f, "goto l{}", label),
-            Hir::Label { id } => write!(f, "l{}", id),
-            Hir::Return => write!(f, "return"),
-            Hir::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
-            Hir::Call { label } => match *label {
+            Tac::Copy { src, dest } => write!(f, "{} := {}", dest, src),
+            Tac::Expression(expr) => write!(f, "{}", expr),
+            Tac::Goto { label } => write!(f, "goto l{}", label),
+            Tac::Label { id } => write!(f, "l{}", id),
+            Tac::Return => write!(f, "return"),
+            Tac::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
+            Tac::Call { label } => match *label {
                 PRINT_PTR_LABEL => write!(f, "call print_ptr"),
                 INPUT_PTR_LABEL => write!(f, "call input_ptr"),
                 PRINT_VAL_LABEL => write!(f, "call print_val"),
                 INPUT_VAL_LABEL => write!(f, "call input_val"),
+                EXIT_LABEL => write!(f, "call exit"),
                 _ => write!(f, "call l{}", label),
             },
-            Hir::Param { operand } => write!(f, "param {}", operand),
+            Tac::Param { operand } => write!(f, "param {}", operand),
         }
     }
 }
 
 pub struct Program {
-    hir: Vec<Hir>,
+    hir: Vec<Tac>,
 }
 
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for hir in &self.hir {
             match hir {
-                Hir::Label { .. } => {
+                Tac::Label { .. } => {
                     writeln!(f, "{}:", hir)?;
                 }
                 _ => {
@@ -181,7 +183,7 @@ impl Program {
     }
 }
 
-pub trait HirVisitor {
+pub trait TacVisitor {
     fn visit_expression(&mut self, expr: &mut Expression);
     fn visit_copy(&mut self, src: &mut Operand, dest: &mut Operand);
     fn visit_goto(&mut self, label: u32);
@@ -192,17 +194,17 @@ pub trait HirVisitor {
     fn visit_param(&mut self, operand: &mut Operand);
 }
 
-impl Hir {
-    pub fn accept<V: HirVisitor>(&mut self, visitor: &mut V) {
+impl Tac {
+    pub fn accept<V: TacVisitor>(&mut self, visitor: &mut V) {
         match self {
-            Hir::Expression(expr) => visitor.visit_expression(expr),
-            Hir::Copy { src, dest } => visitor.visit_copy(src, dest),
-            Hir::Goto { label } => visitor.visit_goto(*label),
-            Hir::Label { id } => visitor.visit_label(*id),
-            Hir::Return => visitor.visit_return(),
-            Hir::If { condition, label } => visitor.visit_if(condition, *label),
-            Hir::Call { label } => visitor.visit_call(*label),
-            Hir::Param { operand } => visitor.visit_param(operand),
+            Tac::Expression(expr) => visitor.visit_expression(expr),
+            Tac::Copy { src, dest } => visitor.visit_copy(src, dest),
+            Tac::Goto { label } => visitor.visit_goto(*label),
+            Tac::Label { id } => visitor.visit_label(*id),
+            Tac::Return => visitor.visit_return(),
+            Tac::If { condition, label } => visitor.visit_if(condition, *label),
+            Tac::Call { label } => visitor.visit_call(*label),
+            Tac::Param { operand } => visitor.visit_param(operand),
         }
     }
 }
