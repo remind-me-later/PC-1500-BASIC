@@ -2,12 +2,7 @@
 10 N=10
 20 FOR I=1 TO N
 30 PRINT "Hello, World!"
-100 PRINT X; 1: END
-70 NEXT I
-40 GOTO 70
-50 RETURN
-60 INPUT "What is your name? "; X$
-80 IF N = 10 THEN PRINT "N is 10" ELSE PRINT "N is not 10"
-90 IF N <> 10 PRINT "N is not 10"
-300 REM Common subexpression elimination
-301 LET A = (B + 2) * 3 + (B + 2) * 4
+40 NEXT I
+50 X = (X + 1) * (X  + 1)
+60 Y = X + 1
+70 GOTO 50

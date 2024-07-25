@@ -1,54 +1,20 @@
-Ast:
-10 LET N = 10
-20 FOR I = 1 TO N
-30     PRINT "Hello, World!"
-40     GOTO 70
-50     RETURN
-60     INPUT "What is your name? "; X$
-70     NEXT I
-80 IF (N = 10) THEN PRINT "N is 10" ELSE PRINT "N is not 10"
-90 IF (N <> 10) THEN PRINT "N is not 10"
-100 PRINT X; 1: END
-301 LET A = (((B + 2) * 3) + ((B + 2) * 4))
-
-Symbols:
-X is INT
-A is INT
-B is INT
-N is INT
-I is INT
-X$ is STRING
-
 Type errors: Ok(())
+String literals:
+["Hello, World!"]
 Hir:
 	V0 := 10
 	V1 := 1
+L0:
 	V2 := V1 >= V0
 	IF V2 GOTO L1
 	PRINT *0
-	GOTO L70
-	RETURN
-	PRINT *1
-	INPUT V3
 	V1 := V1 + 1
 	GOTO L0
 L1:
-	V4 := V0 = 10
-	V5 := V4 = 0
-	IF V5 GOTO L2
-	PRINT *2
-L2:
-	PRINT *3
-	V6 := V4 <> 10
-	V7 := V6 = 0
-	IF V7 GOTO L3
-	PRINT *3
-L3:
-	PRINT V8
-	PRINT 1
-	V11 := V10 + 2
-	V12 := V11 * 3
-	V13 := V12 * 4
-	V14 := V12 + V13
-	V9 := V14
+	V4 := V3 + 1
+	V5 := V4 * V4
+	V3 := V5
+	V7 := V4 + 1
+	V6 := V7
+	GOTO L1
 

@@ -1,7 +1,5 @@
 use std::{collections::HashMap, ptr};
 
-use typed_arena::Arena;
-
 use crate::ast::{self, ExpressionVisitor, ProgramVisitor, StatementVisitor};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -32,11 +30,11 @@ impl std::fmt::Display for BinaryOperator {
             BinaryOperator::Mul => write!(f, "*"),
             BinaryOperator::Div => write!(f, "/"),
             // Logical
-            BinaryOperator::And => write!(f, "AND"),
-            BinaryOperator::Or => write!(f, "OR"),
+            BinaryOperator::And => write!(f, "&&"),
+            BinaryOperator::Or => write!(f, "||"),
             // Comparison
-            BinaryOperator::Eq => write!(f, "="),
-            BinaryOperator::Ne => write!(f, "<>"),
+            BinaryOperator::Eq => write!(f, "=="),
+            BinaryOperator::Ne => write!(f, "!="),
             BinaryOperator::Lt => write!(f, "<"),
             BinaryOperator::Le => write!(f, "<="),
             BinaryOperator::Gt => write!(f, ">"),
@@ -164,9 +162,10 @@ pub struct HirBuilder<'a> {
     str_map: HashMap<*const str, usize>,
     str_literals: Vec<String>,
 
-    line_to_hir_map: HashMap<u32, usize>,
+    line_to_hir_map: HashMap<usize, usize>,
 
     for_stack: Vec<ForInfo<'a>>,
+    goto_list: Vec<usize>,
 
     next_variable: u32,
     next_label: u32,
@@ -185,12 +184,14 @@ impl<'a> HirBuilder<'a> {
             next_label: 0,
             str_map: HashMap::new(),
             str_literals: Vec::new(),
+            goto_list: Vec::new(),
         }
     }
 
-    pub fn build(mut self) -> Program {
+    pub fn build(mut self) -> (Program, Vec<String>) {
         self.program.accept(&mut self);
-        Program { hir: self.hir }
+        let program = Program { hir: self.hir };
+        (program, self.str_literals)
     }
 
     fn get_next_variable_id(&mut self) -> u32 {
@@ -352,6 +353,7 @@ impl<'a> StatementVisitor<'a> for HirBuilder<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &ast::Expression<'a>) {
         let dest = self.visit_variable(variable);
         let src = expression.accept(self);
+
         self.hir.push(Hir::Copy { src, dest });
     }
 
@@ -388,6 +390,7 @@ impl<'a> StatementVisitor<'a> for HirBuilder<'a> {
     }
 
     fn visit_goto(&mut self, line_number: u32) {
+        self.goto_list.push(self.hir.len());
         self.hir.push(Hir::Goto { label: line_number });
     }
 
@@ -409,18 +412,23 @@ impl<'a> StatementVisitor<'a> for HirBuilder<'a> {
         let cmp_dest = Operand::Variable {
             id: self.get_next_variable_id(),
         };
-        self.hir.push(Hir::Expression(Expression {
-            left: index,
-            op: BinaryOperator::Ge,
-            right: to,
-            dest: cmp_dest,
-        }));
 
         let info = ForInfo {
             begin_label: self.get_next_label(),
             end_label: self.get_next_label(),
             step,
         };
+
+        self.hir.push(Hir::Label {
+            id: info.begin_label,
+        });
+
+        self.hir.push(Hir::Expression(Expression {
+            left: index,
+            op: BinaryOperator::Ge,
+            right: to,
+            dest: cmp_dest,
+        }));
 
         self.hir.push(Hir::If {
             condition: cmp_dest,
@@ -461,6 +469,7 @@ impl<'a> StatementVisitor<'a> for HirBuilder<'a> {
     fn visit_end(&mut self) {}
 
     fn visit_gosub(&mut self, line_number: u32) {
+        self.goto_list.push(self.hir.len());
         self.hir.push(Hir::GoSub { label: line_number });
     }
 
@@ -510,9 +519,60 @@ impl<'a> StatementVisitor<'a> for HirBuilder<'a> {
 
 impl<'a> ProgramVisitor<'a> for HirBuilder<'a> {
     fn visit_program(&mut self, program: &'a ast::Program<'a>) {
-        for (line_number, stmt) in program.iter() {
-            self.line_to_hir_map.insert(*line_number, self.hir.len());
+        for (&line_number, stmt) in program.iter() {
+            self.line_to_hir_map
+                .insert(line_number as usize, self.hir.len());
             stmt.accept(self);
+        }
+
+        let mut offset = 0;
+
+        while let Some(og_goto) = self.goto_list.pop() {
+            let goto = og_goto + offset;
+            let line = if let Hir::Goto { label: line } = &self.hir[goto] {
+                *line as usize
+            } else if let Hir::GoSub { label: line } = &self.hir[goto] {
+                *line as usize
+            } else {
+                unreachable!("Invalid goto position");
+            };
+
+            // Add label before jump position
+            let new_label_pos = *self.line_to_hir_map.get(&line).unwrap() + offset;
+
+            // check there is already a label
+            // TODO: ugly as fuck
+            let new_label = if new_label_pos > 1 {
+                if let Hir::Label { id } = &self.hir[new_label_pos - 1] {
+                    *id
+                } else {
+                    let new_label = self.get_next_label();
+
+                    self.hir.insert(new_label_pos, Hir::Label { id: new_label });
+
+                    offset += 1;
+
+                    new_label
+                }
+            } else {
+                let new_label = self.get_next_label();
+
+                self.hir.insert(new_label_pos, Hir::Label { id: new_label });
+
+                offset += 1;
+
+                new_label
+            };
+
+            let goto = og_goto + offset;
+
+            if let Hir::Goto { .. } = &self.hir[goto] {
+                self.hir[goto] = Hir::Goto { label: new_label };
+            } else if let Hir::GoSub { .. } = &self.hir[goto] {
+                self.hir[goto] = Hir::GoSub { label: new_label };
+            } else {
+                unreachable!("Invalid goto position");
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 mod ast;
 mod hir;
 
-use ast::AstPrintVisitor;
+// use ast::AstPrintVisitor;
 use ast::Parser;
 use ast::SemanticCheckVisitor;
 use ast::SymbolTableBuilderVisitor;
@@ -21,16 +21,17 @@ fn main() {
 
     match parser.parse(&input) {
         Ok((_, program)) => {
-            let printer = AstPrintVisitor::new();
-            let output = printer.build(&program);
-            println!("Ast:\n{}", output);
+            // let printer = AstPrintVisitor::new();
+            // let output = printer.build(&program);
+            // println!("Ast:\n{}", output);
             let symbol_table = SymbolTableBuilderVisitor::new(&program).build();
-            println!("Symbols:\n{}", symbol_table);
+            // println!("Symbols:\n{}", symbol_table);
             let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
             let res = type_checker.check();
             println!("Type errors: {:?}", res);
             let hir = HirBuilder::new(&program).build();
-            println!("Hir:\n{}", hir);
+            println!("String literals:\n{:?}", hir.1);
+            println!("Hir:\n{}", hir.0);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }
