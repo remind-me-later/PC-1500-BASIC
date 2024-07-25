@@ -2,36 +2,36 @@ data:
 ["What is your name? ", "Hello, ", "X = ", "Y = "]
 
 start:
-	v0 = 10;
+	v0 = 10
 	param *0
 	call l0
 	param *v1
 	call l1
-	v2 = 1;
+	v2 = 1
 l100:
-	v3 = v2 >= v0;
+	v3 = v2 >= v0
 	if v3 goto l101
 	param *1
 	call l0
 	param *v1
 	call l0
-	v2 = v2 + 1;
+	v2 = v2 + 1
 	goto l100
 l101:
-	v4 = 5;
+	v4 = 5
 l102:
-	v5 = v4 + 1;
-	v6 = v5 * v5;
-	v4 = v6;
-	v8 = v5 + 1;
-	v7 = v8;
+	v5 = v4 + 1
+	v6 = v5 * v5
+	v4 = v6
+	v8 = v5 + 1
+	v7 = v8
 	param *2
 	call l0
 	param v4
-	call l0
+	call l2
 	param *3
 	call l0
 	param v7
-	call l0
+	call l2
 	goto l102
 

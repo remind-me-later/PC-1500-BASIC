@@ -3,8 +3,10 @@ mod hir_builder;
 pub use hir_builder::HirBuilder;
 
 pub const END_OF_BUILTIN_LABELS: u32 = 100;
-pub const PRINT_LABEL: u32 = 0;
-pub const INPUT_LABEL: u32 = 1;
+pub const PRINT_PTR_LABEL: u32 = 0;
+pub const INPUT_PTR_LABEL: u32 = 1;
+pub const PRINT_VAL_LABEL: u32 = 2;
+pub const INPUT_VAL_LABEL: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
@@ -95,7 +97,7 @@ impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} = {} {} {};",
+            "{} = {} {} {}",
             self.dest, self.left, self.op, self.right
         )
     }
@@ -118,11 +120,11 @@ pub enum Hir {
 impl std::fmt::Display for Hir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Hir::Copy { src, dest } => write!(f, "{} = {};", dest, src),
+            Hir::Copy { src, dest } => write!(f, "{} = {}", dest, src),
             Hir::Expression(expr) => write!(f, "{}", expr),
             Hir::Goto { label } => write!(f, "goto l{}", label),
             Hir::GoSub { label } => write!(f, "gosub l{}", label),
-            Hir::Label { id } => write!(f, "l{}:", id),
+            Hir::Label { id } => write!(f, "l{}", id),
             Hir::Return => write!(f, "return"),
             Hir::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
             Hir::Call { label } => write!(f, "call l{}", label),
@@ -140,7 +142,7 @@ impl std::fmt::Display for Program {
         for hir in &self.hir {
             match hir {
                 Hir::Label { .. } => {
-                    writeln!(f, "{}", hir)?;
+                    writeln!(f, "{}:", hir)?;
                 }
                 _ => {
                     writeln!(f, "\t{}", hir)?;

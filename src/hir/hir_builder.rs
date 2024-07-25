@@ -2,10 +2,13 @@ use std::{collections::HashMap, ptr};
 
 use crate::{
     ast::{self, ExpressionVisitor},
-    hir::{INPUT_LABEL, PRINT_LABEL},
+    hir::{INPUT_PTR_LABEL, PRINT_PTR_LABEL},
 };
 
-use super::{BinaryOperator, Expression, Hir, Operand, Program, END_OF_BUILTIN_LABELS};
+use super::{
+    BinaryOperator, Expression, Hir, Operand, Program, END_OF_BUILTIN_LABELS, INPUT_VAL_LABEL,
+    PRINT_VAL_LABEL,
+};
 
 struct ForInfo<'a> {
     begin_label: u32,
@@ -233,7 +236,19 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         for item in content {
             let operand = item.accept(self);
             self.hir.push(Hir::Param { operand });
-            self.hir.push(Hir::Call { label: PRINT_LABEL });
+
+            match operand {
+                Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
+                    self.hir.push(Hir::Call {
+                        label: PRINT_VAL_LABEL,
+                    });
+                }
+                Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
+                    self.hir.push(Hir::Call {
+                        label: PRINT_PTR_LABEL,
+                    });
+                }
+            }
         }
     }
 
@@ -241,12 +256,36 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         if let Some(prompt) = prompt {
             let prompt = prompt.accept(self);
             self.hir.push(Hir::Param { operand: prompt });
-            self.hir.push(Hir::Call { label: PRINT_LABEL });
+
+            match prompt {
+                Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
+                    self.hir.push(Hir::Call {
+                        label: PRINT_VAL_LABEL,
+                    });
+                }
+                Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
+                    self.hir.push(Hir::Call {
+                        label: PRINT_PTR_LABEL,
+                    });
+                }
+            }
         }
 
         let dest = self.visit_variable(variable);
         self.hir.push(Hir::Param { operand: dest });
-        self.hir.push(Hir::Call { label: INPUT_LABEL });
+
+        match dest {
+            Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
+                self.hir.push(Hir::Call {
+                    label: INPUT_VAL_LABEL,
+                });
+            }
+            Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
+                self.hir.push(Hir::Call {
+                    label: INPUT_PTR_LABEL,
+                });
+            }
+        }
     }
 
     fn visit_goto(&mut self, line_number: u32) {
