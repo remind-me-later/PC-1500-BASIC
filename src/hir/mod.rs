@@ -2,11 +2,12 @@ mod hir_builder;
 
 pub use hir_builder::HirBuilder;
 
-pub const END_OF_BUILTIN_LABELS: u32 = 100;
-pub const PRINT_PTR_LABEL: u32 = 0;
-pub const INPUT_PTR_LABEL: u32 = 1;
-pub const PRINT_VAL_LABEL: u32 = 2;
-pub const INPUT_VAL_LABEL: u32 = 3;
+pub const BEGIN_OF_BUILTIN_LABELS: u32 = 0;
+pub const END_OF_BUILTIN_LABELS: u32 = 20;
+pub const PRINT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS;
+pub const INPUT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 1;
+pub const PRINT_VAL_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 2;
+pub const INPUT_VAL_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
@@ -125,7 +126,13 @@ impl std::fmt::Display for Hir {
             Hir::Label { id } => write!(f, "l{}", id),
             Hir::Return => write!(f, "return"),
             Hir::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
-            Hir::Call { label } => write!(f, "call l{}", label),
+            Hir::Call { label } => match *label {
+                PRINT_PTR_LABEL => write!(f, "call print_ptr"),
+                INPUT_PTR_LABEL => write!(f, "call input_ptr"),
+                PRINT_VAL_LABEL => write!(f, "call print_val"),
+                INPUT_VAL_LABEL => write!(f, "call input_val"),
+                _ => write!(f, "call l{}", label),
+            },
             Hir::Param { operand } => write!(f, "param {}", operand),
         }
     }

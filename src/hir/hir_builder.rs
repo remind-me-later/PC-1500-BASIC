@@ -448,7 +448,7 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
                     if self.goto_list[j] >= new_label_pos {
                         self.goto_list[j] += 1;
                     }
-                }
+                } 
 
                 new_label
             };
