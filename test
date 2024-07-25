@@ -1,29 +1,29 @@
-Type errors: Ok(())
-String literals:
+data:
 ["What is your name? ", "Hello, ", "X = ", "Y = "]
-Hir:
-	V0 := 10
-	PRINT [0]
-	INPUT [V1]
-	V2 := 1
-L0:
-	V3 := V2 >= V0
-	IF V3 GOTO L1
-	PRINT [1]
-	PRINT [V1]
-	V2 := V2 + 1
-	GOTO L0
-L1:
-	V4 := 5
-L2:
-	V5 := V4 + 1
-	V6 := V5 * V5
-	V4 := V6
-	V8 := V5 + 1
-	V7 := V8
-	PRINT [2]
-	PRINT V4
-	PRINT [3]
-	PRINT V7
-	GOTO L2
+
+start:
+	v0 = 10;
+	print *0
+	input *v1
+	v2 = 1;
+l0:
+	v3 = v2 >= v0;
+	if v3 goto l1
+	print *1
+	print *v1
+	v2 = v2 + 1;
+	goto l0
+l1:
+	v4 = 5;
+l2:
+	v5 = v4 + 1;
+	v6 = v5 * v5;
+	v4 = v6;
+	v8 = v5 + 1;
+	v7 = v8;
+	print *2
+	print v4
+	print *3
+	print v7
+	goto l2
 

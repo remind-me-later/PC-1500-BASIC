@@ -71,10 +71,10 @@ impl Operand {
 impl std::fmt::Display for Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Operand::Variable { id } => write!(f, "V{}", id),
+            Operand::Variable { id } => write!(f, "v{}", id),
             Operand::NumberLiteral { value } => write!(f, "{}", value),
-            Operand::IndirectVariable { id } => write!(f, "[V{}]", id),
-            Operand::IndirectNumberLiteral { value } => write!(f, "[{}]", value),
+            Operand::IndirectVariable { id } => write!(f, "*v{}", id),
+            Operand::IndirectNumberLiteral { value } => write!(f, "*{}", value),
         }
     }
 }
@@ -91,13 +91,13 @@ impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} := {} {} {}",
+            "{} = {} {} {};",
             self.dest, self.left, self.op, self.right
         )
     }
 }
 
-pub enum Hir {
+pub enum Hir { 
     Expression(Expression),
     Copy { src: Operand, dest: Operand },
     // Control flow
@@ -114,15 +114,15 @@ pub enum Hir {
 impl std::fmt::Display for Hir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Hir::Copy { src, dest } => write!(f, "{} := {}", dest, src),
+            Hir::Copy { src, dest } => write!(f, "{} = {};", dest, src),
             Hir::Expression(expr) => write!(f, "{}", expr),
-            Hir::Goto { label } => write!(f, "GOTO L{}", label),
-            Hir::GoSub { label } => write!(f, "GOSUB L{}", label),
-            Hir::Label { id } => write!(f, "L{}:", id),
-            Hir::Return => write!(f, "RETURN"),
-            Hir::If { condition, label } => write!(f, "IF {} GOTO L{}", condition, label),
-            Hir::Print { operand } => write!(f, "PRINT {}", operand),
-            Hir::Input { dest } => write!(f, "INPUT {}", dest),
+            Hir::Goto { label } => write!(f, "goto l{}", label),
+            Hir::GoSub { label } => write!(f, "gosub l{}", label),
+            Hir::Label { id } => write!(f, "l{}:", id),
+            Hir::Return => write!(f, "return"),
+            Hir::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
+            Hir::Print { operand } => write!(f, "print {}", operand),
+            Hir::Input { dest } => write!(f, "input {}", dest),
         }
     }
 }

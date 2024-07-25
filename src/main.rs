@@ -27,11 +27,11 @@ fn main() {
             let symbol_table = SymbolTableBuilderVisitor::new(&program).build();
             // println!("Symbols:\n{}", symbol_table);
             let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
-            let res = type_checker.check();
-            println!("Type errors: {:?}", res);
+            type_checker.check().unwrap();
+
             let hir = HirBuilder::new(&program).build();
-            println!("String literals:\n{:?}", hir.1);
-            println!("Hir:\n{}", hir.0);
+            println!("data:\n{:?}\n", hir.1);
+            println!("start:\n{}", hir.0);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }
