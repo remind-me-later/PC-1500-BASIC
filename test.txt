@@ -18,11 +18,13 @@ l100:
 	v2 = v2 + 1
 	goto l100
 l101:
+	goto l102
 	v4 = 5
-l102:
+l103:
 	v5 = v4 + 1
 	v6 = v5 * v5
 	v4 = v6
+l102:
 	v8 = v5 + 1
 	v7 = v8
 	param *2
@@ -33,5 +35,5 @@ l102:
 	call l0
 	param v7
 	call l2
-	goto l102
+	goto l103
 

@@ -290,6 +290,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
     fn visit_goto(&mut self, line_number: u32) {
         self.goto_list.push(self.hir.len());
+
         self.hir.push(Hir::Goto { label: line_number });
     }
 
@@ -369,6 +370,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
     fn visit_gosub(&mut self, line_number: u32) {
         self.goto_list.push(self.hir.len());
+
         self.hir.push(Hir::Call { label: line_number });
     }
 
@@ -424,54 +426,42 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
             stmt.accept(self);
         }
 
-        let mut offset = 0;
+        let mut i = 0;
 
-        while let Some(og_goto) = self.goto_list.pop() {
-            let goto = og_goto + offset;
-            let line = if let Hir::Goto { label: line } = &self.hir[goto] {
-                *line as usize
-            } else if let Hir::Call { label: line } = &self.hir[goto] {
-                *line as usize
-            } else {
-                unreachable!("Invalid goto position");
-            };
+        while i < self.goto_list.len() {
+            let goto_idx = self.goto_list[i];
 
-            // Add label before jump position
-            let new_label_pos = *self.line_to_hir_map.get(&line).unwrap() + offset;
+            // TODO: check there is already a label
+            let new_label = {
+                let line = match &self.hir[goto_idx] {
+                    Hir::Goto { label: line } | Hir::Call { label: line } => *line as usize,
+                    _ => unreachable!("Invalid goto position: {}", self.hir[goto_idx]),
+                };
 
-            // check there is already a label
-            // TODO: ugly as fuck
-            let new_label = if new_label_pos > 1 {
-                if let Hir::Label { id } = &self.hir[new_label_pos - 1] {
-                    *id
-                } else {
-                    let new_label = self.get_next_label();
-
-                    self.hir.insert(new_label_pos, Hir::Label { id: new_label });
-
-                    offset += 1;
-
-                    new_label
-                }
-            } else {
+                // Add label before jump position
+                let new_label_pos = *self.line_to_hir_map.get(&line).unwrap();
                 let new_label = self.get_next_label();
 
                 self.hir.insert(new_label_pos, Hir::Label { id: new_label });
 
-                offset += 1;
+                for j in i..self.goto_list.len() {
+                    if self.goto_list[j] >= new_label_pos {
+                        self.goto_list[j] += 1;
+                    }
+                }
 
                 new_label
             };
 
-            let goto = og_goto + offset;
+            let goto_idx = self.goto_list[i];
 
-            if let Hir::Goto { .. } = &self.hir[goto] {
-                self.hir[goto] = Hir::Goto { label: new_label };
-            } else if let Hir::Call { .. } = &self.hir[goto] {
-                self.hir[goto] = Hir::Call { label: new_label };
-            } else {
-                unreachable!("Invalid goto position");
+            match &self.hir[goto_idx] {
+                Hir::Goto { .. } => self.hir[goto_idx] = Hir::Goto { label: new_label },
+                Hir::Call { .. } => self.hir[goto_idx] = Hir::Call { label: new_label },
+                _ => unreachable!("Invalid goto position: {}", self.hir[goto_idx]),
             }
+
+            i += 1;
         }
     }
 }

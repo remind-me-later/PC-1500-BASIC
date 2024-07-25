@@ -4,6 +4,7 @@
 20 FOR I=1 TO N
 30 PRINT "Hello, "; NAME$
 40 NEXT I
+45 GOTO 60
 49 X = 5
 50 X = (X + 1) * (X  + 1)
 60 Y = X + 1
