@@ -108,7 +108,6 @@ pub enum Hir {
     Copy { src: Operand, dest: Operand },
     // Control flow
     Goto { label: u32 },
-    GoSub { label: u32 },
     Label { id: u32 },
     Return,
     If { condition: Operand, label: u32 },
@@ -123,7 +122,6 @@ impl std::fmt::Display for Hir {
             Hir::Copy { src, dest } => write!(f, "{} = {}", dest, src),
             Hir::Expression(expr) => write!(f, "{}", expr),
             Hir::Goto { label } => write!(f, "goto l{}", label),
-            Hir::GoSub { label } => write!(f, "gosub l{}", label),
             Hir::Label { id } => write!(f, "l{}", id),
             Hir::Return => write!(f, "return"),
             Hir::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
@@ -167,7 +165,6 @@ pub trait HirVisitor {
     fn visit_expression(&mut self, expr: &mut Expression);
     fn visit_copy(&mut self, src: &mut Operand, dest: &mut Operand);
     fn visit_goto(&mut self, label: u32);
-    fn visit_gosub(&mut self, label: u32);
     fn visit_label(&mut self, id: u32);
     fn visit_return(&mut self);
     fn visit_if(&mut self, condition: &mut Operand, label: u32);
@@ -181,7 +178,6 @@ impl Hir {
             Hir::Expression(expr) => visitor.visit_expression(expr),
             Hir::Copy { src, dest } => visitor.visit_copy(src, dest),
             Hir::Goto { label } => visitor.visit_goto(*label),
-            Hir::GoSub { label } => visitor.visit_gosub(*label),
             Hir::Label { id } => visitor.visit_label(*id),
             Hir::Return => visitor.visit_return(),
             Hir::If { condition, label } => visitor.visit_if(condition, *label),

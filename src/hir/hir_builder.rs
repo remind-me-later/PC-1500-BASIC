@@ -369,7 +369,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
     fn visit_gosub(&mut self, line_number: u32) {
         self.goto_list.push(self.hir.len());
-        self.hir.push(Hir::GoSub { label: line_number });
+        self.hir.push(Hir::Call { label: line_number });
     }
 
     fn visit_return(&mut self) {
@@ -430,7 +430,7 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
             let goto = og_goto + offset;
             let line = if let Hir::Goto { label: line } = &self.hir[goto] {
                 *line as usize
-            } else if let Hir::GoSub { label: line } = &self.hir[goto] {
+            } else if let Hir::Call { label: line } = &self.hir[goto] {
                 *line as usize
             } else {
                 unreachable!("Invalid goto position");
@@ -467,8 +467,8 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
 
             if let Hir::Goto { .. } = &self.hir[goto] {
                 self.hir[goto] = Hir::Goto { label: new_label };
-            } else if let Hir::GoSub { .. } = &self.hir[goto] {
-                self.hir[goto] = Hir::GoSub { label: new_label };
+            } else if let Hir::Call { .. } = &self.hir[goto] {
+                self.hir[goto] = Hir::Call { label: new_label };
             } else {
                 unreachable!("Invalid goto position");
             }
