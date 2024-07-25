@@ -6,8 +6,8 @@ use crate::{
 };
 
 use super::{
-    BinaryOperator, Expression, Hir, Operand, Program, END_OF_BUILTIN_LABELS, INPUT_VAL_LABEL,
-    PRINT_VAL_LABEL,
+    BinaryOperator, Expression, Hir, IfCondition, Operand, Program, END_OF_BUILTIN_LABELS,
+    INPUT_VAL_LABEL, PRINT_VAL_LABEL,
 };
 
 struct ForInfo<'a> {
@@ -309,9 +309,6 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         });
 
         let to = to.accept(self);
-        let cmp_dest = Operand::Variable {
-            id: self.get_next_variable_id(),
-        };
 
         let info = ForInfo {
             begin_label: self.get_next_label(),
@@ -323,15 +320,12 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
             id: info.begin_label,
         });
 
-        self.hir.push(Hir::Expression(Expression {
-            left: index,
-            op: BinaryOperator::Ge,
-            right: to,
-            dest: cmp_dest,
-        }));
-
         self.hir.push(Hir::If {
-            condition: cmp_dest,
+            condition: IfCondition {
+                left: index,
+                op: BinaryOperator::Ge,
+                right: to,
+            },
             label: info.end_label,
         });
 
@@ -384,23 +378,15 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         then: &'a ast::Statement<'a>,
         else_: Option<&'a ast::Statement<'a>>,
     ) {
-        let cond = condition.accept(self);
-        let neg_cond = Operand::Variable {
-            id: self.get_next_variable_id(),
-        };
-        self.hir.push(Hir::Expression(Expression {
-            left: cond,
-            op: BinaryOperator::Eq,
+        let condition = IfCondition {
+            left: condition.accept(self),
+            op: BinaryOperator::Ne,
             right: Operand::NumberLiteral { value: 0 },
-            dest: neg_cond,
-        }));
+        };
 
         let label = self.get_next_label();
 
-        self.hir.push(Hir::If {
-            condition: neg_cond,
-            label,
-        });
+        self.hir.push(Hir::If { condition, label });
 
         then.accept(self);
 
@@ -448,7 +434,7 @@ impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
                     if self.goto_list[j] >= new_label_pos {
                         self.goto_list[j] += 1;
                     }
-                } 
+                }
 
                 new_label
             };

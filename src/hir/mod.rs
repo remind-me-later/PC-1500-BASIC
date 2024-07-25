@@ -98,9 +98,22 @@ impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} = {} {} {}",
+            "{} := {} {} {}",
             self.dest, self.left, self.op, self.right
         )
+    }
+}
+
+#[derive(PartialEq, Eq, Hash)]
+pub struct IfCondition {
+    left: Operand,
+    op: BinaryOperator,
+    right: Operand,
+}
+
+impl std::fmt::Display for IfCondition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.left, self.op, self.right)
     }
 }
 
@@ -111,7 +124,7 @@ pub enum Hir {
     Goto { label: u32 },
     Label { id: u32 },
     Return,
-    If { condition: Operand, label: u32 },
+    If { condition: IfCondition, label: u32 },
     // Labels 0-100 are reserved for built-in functions
     Call { label: u32 },
     Param { operand: Operand },
@@ -120,7 +133,7 @@ pub enum Hir {
 impl std::fmt::Display for Hir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Hir::Copy { src, dest } => write!(f, "{} = {}", dest, src),
+            Hir::Copy { src, dest } => write!(f, "{} := {}", dest, src),
             Hir::Expression(expr) => write!(f, "{}", expr),
             Hir::Goto { label } => write!(f, "goto l{}", label),
             Hir::Label { id } => write!(f, "l{}", id),
@@ -174,7 +187,7 @@ pub trait HirVisitor {
     fn visit_goto(&mut self, label: u32);
     fn visit_label(&mut self, id: u32);
     fn visit_return(&mut self);
-    fn visit_if(&mut self, condition: &mut Operand, label: u32);
+    fn visit_if(&mut self, condition: &mut IfCondition, label: u32);
     fn visit_call(&mut self, label: u32);
     fn visit_param(&mut self, operand: &mut Operand);
 }
