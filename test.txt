@@ -1,23 +1,10 @@
 Ast:
-6 LET X = 1
-7 LET Y = (X + 2)
-8 PRINT "X = "; X; "Y = "; Y
-9 GOSUB 65
-10 LET N = 10
-15 INPUT ""What is your name? ""; NAME$
-16 IF (NAME$ = "STOP") THEN END ELSE LET X = 99
-20 FOR I = 1 TO N STEP 2
-30     PRINT "Hello, "; NAME$
-40     NEXT I
-45 GOTO 60
-49 LET X = 5
-50 LET X = ((X + 1) * (X + 1))
-60 LET Y = (X + 1)
-65 (PRINT "X = "; X; "Y = "; Y: RETURN)
-70 GOTO 50
+10 LET X = 1
+20 IF (X = 1) THEN (LET X = 30: LET Y = 40: LET Z = 50)
+30 PRINT "Y = "; Y
 
 data:
-["X = ", "Y = ", "What is your name? ", "STOP", "Hello, "]
+["Y = "]
 
 start:
 print_val:
@@ -31,219 +18,65 @@ input_ptr:
 exit:
 	return
 	v0 := 1
-	v2 := v0 + 2
-	v1 := v2
-	param *0
-	call print_ptr
-	param v0
-	call print_val
-	param *1
-	call print_ptr
-	param v1
-	call print_val
-	call l24
-	v3 := 10
-	param *2
-	call print_ptr
-	param *v4
-	call input_ptr
-	if *v4 != *3 goto l20
-	call exit
-	goto l21
+	if v0 != 1 goto l20
+	v0 := 30
+	v1 := 40
+	v2 := 50
 l20:
-	v0 := 99
-l21:
-	v5 := 1
-l22:
-	if v5 >= v3 goto l23
-	param *4
-	call print_ptr
-	param *v4
-	call print_ptr
-	v5 := v5 + 2
-	goto l22
-l23:
-	goto l25
-	v0 := 5
-l26:
-	v6 := v2 + 1
-	v7 := v6 * v6
-	v0 := v7
-l25:
-	v8 := v6 + 1
-	v1 := v8
-l24:
 	param *0
-	call print_ptr
-	param v0
-	call print_val
-	param *1
 	call print_ptr
 	param v1
 	call print_val
-	return
-	goto l26
 
-Constant folded cfg:
---- BB:0 ---
-
---- BB:1 ---
+Original cfg:
+=== BB:0 ===
 print_val:
 	return
+==> <==
 
---- BB:2 ---
-
---- BB:3 ---
+=== BB:1 ===
 print_ptr:
 	return
+==> <==
 
---- BB:4 ---
-
---- BB:5 ---
+=== BB:2 ===
 input_val:
 	return
+==> <==
 
---- BB:6 ---
-
---- BB:7 ---
+=== BB:3 ===
 input_ptr:
 	return
+==> <==
 
---- BB:8 ---
-
---- BB:9 ---
+=== BB:4 ===
 exit:
 	return
+==> <==
 
---- BB:10 ---
+=== BB:5 ===
 	v0 := 1
-	v2 := 3
-	v1 := 3
-	param *0
-	call print_ptr
---- TO BB:3 ---
+	if v0 != 1 goto l20
+==> BB:7 BB:6 <==
 
---- BB:11 ---
-	param v0
-	call print_val
---- TO BB:1 ---
+=== BB:6 ===
+	v0 := 30
+	v1 := 40
+	v2 := 50
+==> BB:7 <==
 
---- BB:12 ---
-	param *1
-	call print_ptr
---- TO BB:3 ---
-
---- BB:13 ---
-	param v1
-	call print_val
---- TO BB:1 ---
-
---- BB:14 ---
-	call l24
---- TO BB:32 ---
-
---- BB:15 ---
-	v3 := 10
-	param *2
-	call print_ptr
---- TO BB:3 ---
-
---- BB:16 ---
-	param *v4
-	call input_ptr
---- TO BB:7 ---
-
---- BB:17 ---
-	if *v4 != *3 goto l20
---- TO BB:21 ---
-
---- BB:18 ---
-	call exit
---- TO BB:9 ---
-
---- BB:19 ---
-	goto l21
---- TO BB:22 ---
-
---- BB:20 ---
-
---- BB:21 ---
+=== BB:7 ===
 l20:
-	v0 := 99
-
---- BB:22 ---
-l21:
-	v5 := 1
-
---- BB:23 ---
-l22:
-	if v5 >= v3 goto l23
---- TO BB:28 ---
-
---- BB:24 ---
-	param *4
-	call print_ptr
---- TO BB:3 ---
-
---- BB:25 ---
-	param *v4
-	call print_ptr
---- TO BB:3 ---
-
---- BB:26 ---
-	v5 := v5 + 2
-	goto l22
---- TO BB:23 ---
-
---- BB:27 ---
-
---- BB:28 ---
-l23:
-	goto l25
---- TO BB:31 ---
-
---- BB:29 ---
-	v0 := 5
-
---- BB:30 ---
-l26:
-	v6 := v2 + 1
-	v7 := v6 * v6
-	v0 := v7
-
---- BB:31 ---
-l25:
-	v8 := v6 + 1
-	v1 := v8
-
---- BB:32 ---
-l24:
 	param *0
 	call print_ptr
---- TO BB:3 ---
+==> BB:1 <==
 
---- BB:33 ---
-	param v0
-	call print_val
---- TO BB:1 ---
-
---- BB:34 ---
-	param *1
-	call print_ptr
---- TO BB:3 ---
-
---- BB:35 ---
+=== BB:8 ===
 	param v1
 	call print_val
---- TO BB:1 ---
+==> BB:0 <==
 
---- BB:36 ---
-	return
-
---- BB:37 ---
-	goto l26
---- TO BB:30 ---
-
---- BB:38 ---
+=== BB:9 ===
+==> <==
 
 

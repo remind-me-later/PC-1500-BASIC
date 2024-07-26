@@ -114,15 +114,43 @@ impl BasicBlock {
                         }
                     }
                 }
+
+                Tac::Label { id } => {
+                    new_tacs.push(Tac::Label { id: *id });
+                }
+                Tac::Param { operand } => {
+                    if let Some(val) = var_val.get(operand) {
+                        new_tacs.push(Tac::Param {
+                            operand: Operand::NumberLiteral { value: *val },
+                        });
+                    } else {
+                        new_tacs.push(Tac::Param { operand: *operand });
+                    }
+                }
+
+                // Branching, must be last instruction in block, by construction
                 Tac::If {
                     op,
                     left,
                     right,
                     label,
                 } => {
-                    if let (Some(left_val), Some(right_val)) =
-                        (var_val.get(left).copied(), var_val.get(right).copied())
-                    {
+                    if let (Some(left_val), Some(right_val)) = (
+                        var_val.get(left).copied().or({
+                            if let Operand::NumberLiteral { value } = left {
+                                Some(*value)
+                            } else {
+                                None
+                            }
+                        }),
+                        var_val.get(right).copied().or({
+                            if let Operand::NumberLiteral { value } = right {
+                                Some(*value)
+                            } else {
+                                None
+                            }
+                        }),
+                    ) {
                         let result = match op {
                             crate::tac::BinaryOperator::Eq => (left_val == right_val) as i32,
                             crate::tac::BinaryOperator::Ne => (left_val != right_val) as i32,
@@ -145,25 +173,15 @@ impl BasicBlock {
                         });
                     }
                 }
-                Tac::Param { operand } => {
-                    if let Some(val) = var_val.get(operand) {
-                        new_tacs.push(Tac::Param {
-                            operand: Operand::NumberLiteral { value: *val },
-                        });
-                    } else {
-                        new_tacs.push(Tac::Param { operand: *operand });
-                    }
-                }
 
                 Tac::Goto { label } => {
                     new_tacs.push(Tac::Goto { label: *label });
                 }
-                Tac::Label { id } => {
-                    new_tacs.push(Tac::Label { id: *id });
-                }
+
                 Tac::Return => {
                     new_tacs.push(Tac::Return);
                 }
+
                 Tac::Call { label } => {
                     new_tacs.push(Tac::Call { label: *label });
                 }
@@ -176,7 +194,7 @@ impl BasicBlock {
 
 impl std::fmt::Display for BasicBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "--- BB:{} ---", self.id)?;
+        writeln!(f, "=== BB:{} ===", self.id)?;
         for tac in &self.tacs {
             match tac {
                 Tac::Label { .. } => {
@@ -210,9 +228,11 @@ impl std::fmt::Display for Cfg {
         for node in self.graph.node_indices() {
             write!(f, "{}", self.graph[node])?;
             let neighbours = self.graph.neighbors(node);
+            write!(f, "==> ")?;
             for neighbour in neighbours {
-                writeln!(f, "--- TO BB:{} ---", self.graph[neighbour].id)?;
+                write!(f, "BB:{} ", self.graph[neighbour].id)?;
             }
+            writeln!(f, "<==")?;
             writeln!(f)?;
         }
 
@@ -252,6 +272,11 @@ impl CFGBuilder {
     }
 
     fn new_block(&mut self) -> NodeIndex {
+        let current_block = self.graph.node_weight(self.current_block).unwrap();
+        if current_block.tacs.is_empty() {
+            return self.current_block;
+        }
+
         let block = BasicBlock::new(self.next_id);
         self.current_block = self.graph.add_node(block);
         self.next_id += 1;
@@ -280,26 +305,32 @@ impl TacVisitor for CFGBuilder {
         right: &Operand,
         dest: &Operand,
     ) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::BinExpression {
-            left: *left,
-            op,
-            right: *right,
-            dest: *dest,
-        });
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::BinExpression {
+                left: *left,
+                op,
+                right: *right,
+                dest: *dest,
+            });
     }
 
     fn visit_copy(&mut self, src: &Operand, dest: &Operand) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::Copy {
-            src: *src,
-            dest: *dest,
-        });
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::Copy {
+                src: *src,
+                dest: *dest,
+            });
     }
 
     fn visit_goto(&mut self, label: u32) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::Goto { label });
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::Goto { label });
 
         self.branch_stack.push((self.current_block, label));
 
@@ -307,15 +338,36 @@ impl TacVisitor for CFGBuilder {
     }
 
     fn visit_label(&mut self, id: u32) {
+        let last_block_idx = self.current_block;
         self.new_block();
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::Label { id });
-        self.label_to_block.insert(id, self.current_block);
+        let current_block_idx = self.current_block;
+
+        self.graph
+            .node_weight_mut(current_block_idx)
+            .unwrap()
+            .push(Tac::Label { id });
+
+        self.label_to_block.insert(id, current_block_idx);
+
+        if last_block_idx == current_block_idx {
+            return;
+        }
+
+        let last_block = self.graph.node_weight(last_block_idx).unwrap();
+
+        match last_block.tacs.last().unwrap() {
+            Tac::Goto { .. } | Tac::If { .. } | Tac::Call { .. } | Tac::Return => {}
+            _ => {
+                self.graph.add_edge(last_block_idx, current_block_idx, ());
+            }
+        }
     }
 
     fn visit_return(&mut self) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::Return);
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::Return);
 
         self.new_block();
     }
@@ -327,22 +379,29 @@ impl TacVisitor for CFGBuilder {
         right: &Operand,
         label: u32,
     ) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::If {
-            op,
-            left: *left,
-            right: *right,
-            label,
-        });
+        let current_block_idx = self.current_block;
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::If {
+                op,
+                left: *left,
+                right: *right,
+                label,
+            });
 
         self.branch_stack.push((self.current_block, label));
 
-        self.new_block();
+        let new_block_idx = self.new_block();
+
+        self.graph.add_edge(current_block_idx, new_block_idx, ());
     }
 
     fn visit_call(&mut self, label: u32) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::Call { label });
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::Call { label });
 
         self.branch_stack.push((self.current_block, label));
 
@@ -350,7 +409,9 @@ impl TacVisitor for CFGBuilder {
     }
 
     fn visit_param(&mut self, operand: &Operand) {
-        let current_block = self.graph.node_weight_mut(self.current_block).unwrap();
-        current_block.push(Tac::Param { operand: *operand });
+        self.graph
+            .node_weight_mut(self.current_block)
+            .unwrap()
+            .push(Tac::Param { operand: *operand });
     }
 }
