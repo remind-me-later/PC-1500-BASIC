@@ -2,7 +2,8 @@ mod tac_builder;
 
 pub use tac_builder::HirBuilder;
 
-pub const BEGIN_OF_BUILTIN_LABELS: u32 = 0;
+pub const START_LABEL: u32 = 0;
+pub const BEGIN_OF_BUILTIN_LABELS: u32 = 1;
 pub const END_OF_BUILTIN_LABELS: u32 = 20;
 pub const PRINT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS;
 pub const INPUT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 1;
@@ -51,7 +52,7 @@ impl std::fmt::Display for BinaryOperator {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum Operand {
     Variable { id: u32 },
     IndirectVariable { id: u32 },
@@ -87,6 +88,7 @@ impl std::fmt::Display for Operand {
     }
 }
 
+#[derive(Debug)]
 pub enum Tac {
     // Expressions
     BinExpression {
@@ -146,14 +148,9 @@ impl std::fmt::Display for Tac {
             } => {
                 write!(f, "if {} {} {} goto l{}", left, op, right, label)
             }
-            Tac::Call { label } => match *label {
-                PRINT_PTR_LABEL => write!(f, "call print_ptr"),
-                INPUT_PTR_LABEL => write!(f, "call input_ptr"),
-                PRINT_VAL_LABEL => write!(f, "call print_val"),
-                INPUT_VAL_LABEL => write!(f, "call input_val"),
-                EXIT_LABEL => write!(f, "call exit"),
-                _ => write!(f, "call l{}", label),
-            },
+            Tac::Call { label } => {
+                write!(f, "call l{}", label)
+            }
             Tac::Param { operand } => write!(f, "param {}", operand),
         }
     }
@@ -164,6 +161,10 @@ pub struct Program {
 }
 
 impl Program {
+    pub fn new() -> Self {
+        Program { hir: Vec::new() }
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Tac> {
         self.hir.iter()
     }

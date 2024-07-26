@@ -26,11 +26,14 @@ fn main() {
             // println!("Symbols:\n{}", symbol_table);
             let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
             type_checker.check().unwrap();
-            let hir = HirBuilder::new(&program).build();
+            let (hir, const_data) = HirBuilder::new(&program).build();
             drop(bump);
 
-            println!("data:\n{:?}\n", hir.1);
-            println!("start:\n{}", hir.0);
+            println!("data:\n{:?}\n", const_data);
+            println!("start:\n{}", hir);
+
+            let cfg = ssa::CFGBuilder::new(hir).build();
+            println!("cfg:\n{:?}", cfg);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }

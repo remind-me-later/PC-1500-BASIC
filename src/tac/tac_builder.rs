@@ -411,6 +411,33 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
 impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
     fn visit_program(&mut self, program: &'a ast::Program<'a>) {
+        // FIXME: very ugly hack, should implement extern definitions probably
+        // but for testing should be fine
+        self.hir.push(Tac::Label {
+            id: PRINT_VAL_LABEL,
+        });
+        self.hir.push(Tac::Return);
+
+        self.hir.push(Tac::Label {
+            id: PRINT_PTR_LABEL,
+        });
+        self.hir.push(Tac::Return);
+
+        self.hir.push(Tac::Label {
+            id: INPUT_VAL_LABEL,
+        });
+        self.hir.push(Tac::Return);
+
+        self.hir.push(Tac::Label {
+            id: INPUT_PTR_LABEL,
+        });
+        self.hir.push(Tac::Return);
+
+        self.hir.push(Tac::Label { id: EXIT_LABEL });
+        self.hir.push(Tac::Return);
+
+        // Real code
+
         for (&line_number, stmt) in program.iter() {
             self.line_to_hir_map
                 .insert(line_number as usize, self.hir.len());
