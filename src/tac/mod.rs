@@ -2,6 +2,8 @@ mod tac_builder;
 
 pub use tac_builder::HirBuilder;
 
+use crate::ast;
+
 pub const START_LABEL: u32 = 0;
 pub const BEGIN_OF_BUILTIN_LABELS: u32 = 1;
 pub const END_OF_BUILTIN_LABELS: u32 = 20;
@@ -48,6 +50,25 @@ impl std::fmt::Display for BinaryOperator {
             BinaryOperator::Le => write!(f, "<="),
             BinaryOperator::Gt => write!(f, ">"),
             BinaryOperator::Ge => write!(f, ">="),
+        }
+    }
+}
+
+impl From<ast::BinaryOperator> for BinaryOperator {
+    fn from(op: ast::BinaryOperator) -> Self {
+        match op {
+            ast::BinaryOperator::Add => BinaryOperator::Add,
+            ast::BinaryOperator::Sub => BinaryOperator::Sub,
+            ast::BinaryOperator::Mul => BinaryOperator::Mul,
+            ast::BinaryOperator::Div => BinaryOperator::Div,
+            ast::BinaryOperator::And => BinaryOperator::And,
+            ast::BinaryOperator::Or => BinaryOperator::Or,
+            ast::BinaryOperator::Eq => BinaryOperator::Eq,
+            ast::BinaryOperator::Ne => BinaryOperator::Ne,
+            ast::BinaryOperator::Lt => BinaryOperator::Lt,
+            ast::BinaryOperator::Le => BinaryOperator::Le,
+            ast::BinaryOperator::Gt => BinaryOperator::Gt,
+            ast::BinaryOperator::Ge => BinaryOperator::Ge,
         }
     }
 }
@@ -127,6 +148,18 @@ pub enum Tac {
 
 impl std::fmt::Display for Tac {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn print_label(f: &mut std::fmt::Formatter<'_>, id: u32) -> std::fmt::Result {
+            match id {
+                START_LABEL => write!(f, "start"),
+                PRINT_PTR_LABEL => write!(f, "print_ptr"),
+                INPUT_PTR_LABEL => write!(f, "input_ptr"),
+                PRINT_VAL_LABEL => write!(f, "print_val"),
+                INPUT_VAL_LABEL => write!(f, "input_val"),
+                EXIT_LABEL => write!(f, "exit"),
+                _ => write!(f, "l{}", id),
+            }
+        }
+
         match self {
             Tac::Copy { src, dest } => write!(f, "{} := {}", dest, src),
             Tac::BinExpression {
@@ -137,8 +170,11 @@ impl std::fmt::Display for Tac {
             } => {
                 write!(f, "{} := {} {} {}", dest, left, op, right)
             }
-            Tac::Goto { label } => write!(f, "goto l{}", label),
-            Tac::Label { id } => write!(f, "l{}", id),
+            Tac::Goto { label } => {
+                write!(f, "goto ")?;
+                print_label(f, *label)
+            }
+            Tac::Label { id } => print_label(f, *id),
             Tac::Return => write!(f, "return"),
             Tac::If {
                 op,
@@ -146,10 +182,12 @@ impl std::fmt::Display for Tac {
                 right,
                 label,
             } => {
-                write!(f, "if {} {} {} goto l{}", left, op, right, label)
+                write!(f, "if {} {} {} goto ", left, op, right)?;
+                print_label(f, *label)
             }
             Tac::Call { label } => {
-                write!(f, "call l{}", label)
+                write!(f, "call ")?;
+                print_label(f, *label)
             }
             Tac::Param { operand } => write!(f, "param {}", operand),
         }

@@ -14,7 +14,6 @@ pub struct AstBuilder<'parser> {
     bump: &'parser bumpalo::Bump,
 
     str_map: RefCell<HashMap<&'parser str, &'parser str>>,
-    expr_map: RefCell<HashMap<&'parser Expression<'parser>, &'parser Expression<'parser>>>,
 }
 
 impl<'parser> AstBuilder<'parser> {
@@ -22,7 +21,6 @@ impl<'parser> AstBuilder<'parser> {
         Self {
             bump,
             str_map: RefCell::new(HashMap::new()),
-            expr_map: RefCell::new(HashMap::new()),
         }
     }
 
@@ -37,13 +35,7 @@ impl<'parser> AstBuilder<'parser> {
     }
 
     fn get_expr(&self, expr: Expression<'parser>) -> &'parser Expression<'parser> {
-        if self.expr_map.borrow().contains_key(&expr) {
-            self.expr_map.borrow().get(&expr).unwrap()
-        } else {
-            let expr = self.bump.alloc(expr);
-            self.expr_map.borrow_mut().insert(expr, expr);
-            expr
-        }
+        self.bump.alloc(expr)
     }
 
     fn parse_line_number(input: &str) -> IResult<&str, u32> {
@@ -353,13 +345,13 @@ impl<'parser> AstBuilder<'parser> {
         let (input, _) = opt(preceded(space1, tag("THEN")))(input)?;
         let (input, _) = space1(input)?;
 
-        let (input, then) = self.parse_atomic_statement(input)?;
+        let (input, then) = self.parse_statement(input)?;
         let then = self.bump.alloc(then);
 
         let (input, else_) = opt(preceded(space1, move |i| {
             let (i, _) = tag("ELSE")(i)?;
             let (i, _) = space1(i)?;
-            let (i, else_) = self.parse_atomic_statement(i)?;
+            let (i, else_) = self.parse_statement(i)?;
             let else_ = self.bump.alloc(else_);
             Ok((i, else_))
         }))(input)?;

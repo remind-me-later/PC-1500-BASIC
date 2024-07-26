@@ -1,62 +1,83 @@
+Ast:
+10 LET X = 1
+20 IF (X = 1) THEN (LET X = 30: LET Y = 40: LET Z = 50)
+30 PRINT "Y = "; Y
+
 data:
-["What is your name? ", "STOP", "Hello, ", "X = ", "Y = "]
+["Y = "]
 
 start:
-l3:
+print_val:
 	return
-l1:
+print_ptr:
 	return
-l4:
+input_val:
 	return
-l2:
+input_ptr:
 	return
-l5:
+exit:
 	return
 	v0 := 1
-	v1 := 1
-	call l24
-	v2 := 10
-	param *0
-	call l1
-	param *v3
-	call l2
-	v4 := *v3 == *1
-	if v4 != 0 goto l20
-	call l5
-	goto l21
+	if v0 != 1 goto l20
+	v0 := 30
+	v1 := 40
+	v2 := 50
 l20:
-	v0 := 99
-l21:
-	v5 := 1
-l22:
-	if v5 >= v2 goto l23
-	param *2
-	call l1
-	param *v3
-	call l1
-	v5 := v5 + 2
-	goto l22
-l23:
-	goto l25
-	v0 := 5
-l26:
-	v6 := v0 + 1
-	v7 := v6 * v6
-	v0 := v7
-l25:
-	v8 := v6 + 1
-	v1 := v8
-l24:
-	param *3
-	call l1
-	param v0
-	call l3
-	param *4
-	call l1
+	param *0
+	call print_ptr
 	param v1
-	call l3
-	return
-	goto l26
+	call print_val
 
-cfg:
-Cfg { graph: Graph { Ty: "Directed", node_count: 35, edge_count: 18, edges: (14, 14), (20, 20), (10, 28), (11, 3), (12, 7), (14, 17), (14, 9), (16, 18), (20, 24), (20, 3), (21, 3), (23, 19), (25, 27), (28, 3), (29, 1), (30, 3), (31, 1), (34, 26), node weights: {0: BasicBlock { start_label: 0, tacs: [] }, 1: BasicBlock { start_label: 3, tacs: [Label { id: 3 }, Return] }, 2: BasicBlock { start_label: 2, tacs: [] }, 3: BasicBlock { start_label: 1, tacs: [Label { id: 1 }, Return] }, 4: BasicBlock { start_label: 4, tacs: [] }, 5: BasicBlock { start_label: 4, tacs: [Label { id: 4 }, Return] }, 6: BasicBlock { start_label: 6, tacs: [] }, 7: BasicBlock { start_label: 2, tacs: [Label { id: 2 }, Return] }, 8: BasicBlock { start_label: 8, tacs: [] }, 9: BasicBlock { start_label: 5, tacs: [Label { id: 5 }, Return] }, 10: BasicBlock { start_label: 10, tacs: [Copy { src: NumberLiteral { value: 1 }, dest: Variable { id: 0 } }, Copy { src: NumberLiteral { value: 1 }, dest: Variable { id: 1 } }, Call { label: 24 }] }, 11: BasicBlock { start_label: 11, tacs: [Copy { src: NumberLiteral { value: 10 }, dest: Variable { id: 2 } }, Param { operand: IndirectNumberLiteral { value: 0 } }, Call { label: 1 }] }, 12: BasicBlock { start_label: 12, tacs: [Param { operand: IndirectVariable { id: 3 } }, Call { label: 2 }] }, 13: BasicBlock { start_label: 13, tacs: [BinExpression { left: IndirectVariable { id: 3 }, op: Eq, right: IndirectNumberLiteral { value: 1 }, dest: Variable { id: 4 } }, If { op: Ne, left: Variable { id: 4 }, right: NumberLiteral { value: 0 }, label: 20 }] }, 14: BasicBlock { start_label: 14, tacs: [Call { label: 5 }] }, 15: BasicBlock { start_label: 15, tacs: [Goto { label: 21 }] }, 16: BasicBlock { start_label: 16, tacs: [] }, 17: BasicBlock { start_label: 20, tacs: [Label { id: 20 }, Copy { src: NumberLiteral { value: 99 }, dest: Variable { id: 0 } }] }, 18: BasicBlock { start_label: 21, tacs: [Label { id: 21 }, Copy { src: NumberLiteral { value: 1 }, dest: Variable { id: 5 } }] }, 19: BasicBlock { start_label: 22, tacs: [Label { id: 22 }, If { op: Ge, left: Variable { id: 5 }, right: Variable { id: 2 }, label: 23 }] }, 20: BasicBlock { start_label: 20, tacs: [Param { operand: IndirectNumberLiteral { value: 2 } }, Call { label: 1 }] }, 21: BasicBlock { start_label: 21, tacs: [Param { operand: IndirectVariable { id: 3 } }, Call { label: 1 }] }, 22: BasicBlock { start_label: 22, tacs: [BinExpression { left: Variable { id: 5 }, op: Add, right: NumberLiteral { value: 2 }, dest: Variable { id: 5 } }, Goto { label: 22 }] }, 23: BasicBlock { start_label: 23, tacs: [] }, 24: BasicBlock { start_label: 23, tacs: [Label { id: 23 }, Goto { label: 25 }] }, 25: BasicBlock { start_label: 25, tacs: [Copy { src: NumberLiteral { value: 5 }, dest: Variable { id: 0 } }] }, 26: BasicBlock { start_label: 26, tacs: [Label { id: 26 }, BinExpression { left: Variable { id: 0 }, op: Add, right: NumberLiteral { value: 1 }, dest: Variable { id: 6 } }, BinExpression { left: Variable { id: 6 }, op: Mul, right: Variable { id: 6 }, dest: Variable { id: 7 } }, Copy { src: Variable { id: 7 }, dest: Variable { id: 0 } }] }, 27: BasicBlock { start_label: 25, tacs: [Label { id: 25 }, BinExpression { left: Variable { id: 6 }, op: Add, right: NumberLiteral { value: 1 }, dest: Variable { id: 8 } }, Copy { src: Variable { id: 8 }, dest: Variable { id: 1 } }] }, 28: BasicBlock { start_label: 24, tacs: [Label { id: 24 }, Param { operand: IndirectNumberLiteral { value: 3 } }, Call { label: 1 }] }, 29: BasicBlock { start_label: 29, tacs: [Param { operand: Variable { id: 0 } }, Call { label: 3 }] }, 30: BasicBlock { start_label: 30, tacs: [Param { operand: IndirectNumberLiteral { value: 4 } }, Call { label: 1 }] }, 31: BasicBlock { start_label: 31, tacs: [Param { operand: Variable { id: 1 } }, Call { label: 3 }] }, 32: BasicBlock { start_label: 32, tacs: [Return] }, 33: BasicBlock { start_label: 33, tacs: [Goto { label: 26 }] }, 34: BasicBlock { start_label: 34, tacs: [] }} } }
+Constant folded cfg:
+--- BB:0 ---
+
+--- BB:1 ---
+	print_val
+	return
+
+--- BB:2 ---
+
+--- BB:3 ---
+	print_ptr
+	return
+
+--- BB:4 ---
+
+--- BB:5 ---
+	input_val
+	return
+
+--- BB:6 ---
+
+--- BB:7 ---
+	input_ptr
+	return
+
+--- BB:8 ---
+
+--- BB:9 ---
+	exit
+	return
+
+--- BB:10 ---
+	v0 := 1
+	if v0 != 1 goto l20
+--- TO BB:12 ---
+
+--- BB:11 ---
+	v0 := 30
+	v1 := 40
+	v2 := 50
+
+--- BB:12 ---
+	l20
+	call print_ptr
+--- TO BB:3 ---
+
+--- BB:13 ---
+	call print_val
+--- TO BB:1 ---
+
+--- BB:14 ---
+
+

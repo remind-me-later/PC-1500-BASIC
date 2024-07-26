@@ -154,12 +154,14 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
 
     fn visit_seq(&mut self, statements: &'a [Statement<'a>]) {
         // colon separated list
+        self.output.push('(');
         for (i, statement) in statements.iter().enumerate() {
             if i > 0 {
                 self.output.push_str(": ");
             }
             statement.accept(self);
         }
+        self.output.push(')');
     }
 }
 

@@ -1,9 +1,9 @@
 mod ast;
-mod ssa;
+mod cfg;
 mod tac;
 
-// use ast::AstPrintVisitor;
 use ast::AstBuilder;
+use ast::AstPrintVisitor;
 use ast::SemanticCheckVisitor;
 use ast::SymbolTableBuilderVisitor;
 use tac::HirBuilder;
@@ -19,9 +19,9 @@ fn main() {
 
     match parser.parse(&input) {
         Ok((_, program)) => {
-            // let printer = AstPrintVisitor::new();
-            // let output = printer.build(&program);
-            // println!("Ast:\n{}", output);
+            let printer = AstPrintVisitor::new();
+            let output = printer.build(&program);
+            println!("Ast:\n{}", output);
             let symbol_table = SymbolTableBuilderVisitor::new(&program).build();
             // println!("Symbols:\n{}", symbol_table);
             let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
@@ -32,8 +32,10 @@ fn main() {
             println!("data:\n{:?}\n", const_data);
             println!("start:\n{}", hir);
 
-            let cfg = ssa::CFGBuilder::new(hir).build();
-            println!("cfg:\n{:?}", cfg);
+            let mut cfg = cfg::CFGBuilder::new(hir).build();
+            // println!("Original cfg:\n{}", cfg);
+            cfg.constant_fold();
+            println!("Constant folded cfg:\n{}", cfg);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }

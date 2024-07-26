@@ -81,6 +81,18 @@ impl<'a> HirBuilder<'a> {
             id as u32
         }
     }
+
+    fn negate_comparison(op: BinaryOperator) -> BinaryOperator {
+        match op {
+            BinaryOperator::Eq => BinaryOperator::Ne,
+            BinaryOperator::Ne => BinaryOperator::Eq,
+            BinaryOperator::Lt => BinaryOperator::Ge,
+            BinaryOperator::Le => BinaryOperator::Gt,
+            BinaryOperator::Gt => BinaryOperator::Le,
+            BinaryOperator::Ge => BinaryOperator::Lt,
+            _ => unreachable!("Invalid comparison operator: {:?}", op),
+        }
+    }
 }
 
 impl<'a> ast::ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
@@ -141,82 +153,12 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
             id: self.get_next_variable_id(),
         };
 
-        let expr = match op {
-            ast::BinaryOperator::Add => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Add,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Sub => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Sub,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Mul => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Mul,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Div => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Div,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::And => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::And,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Or => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Or,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Eq => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Eq,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Ne => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Ne,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Lt => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Lt,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Le => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Le,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Gt => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Gt,
-                right: right_op,
-                dest: dest_op,
-            },
-            ast::BinaryOperator::Ge => Tac::BinExpression {
-                left: left_op,
-                op: BinaryOperator::Ge,
-                right: right_op,
-                dest: dest_op,
-            },
-        };
-
-        self.hir.push(expr);
+        self.hir.push(Tac::BinExpression {
+            left: left_op,
+            op: BinaryOperator::from(op),
+            right: right_op,
+            dest: dest_op,
+        });
         self.expr_map.insert(left, dest_op);
 
         dest_op
@@ -379,15 +321,51 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         then: &'a ast::Statement<'a>,
         else_: Option<&'a ast::Statement<'a>>,
     ) {
-        let left = condition.accept(self);
         let label = self.get_next_label();
 
-        self.hir.push(Tac::If {
-            op: BinaryOperator::Ne,
-            left,
-            right: Operand::NumberLiteral { value: 0 },
-            label,
-        });
+        let if_ = match condition {
+            ast::Expression::NumberLiteral(val) => {
+                let literal = self.visit_number_literal(*val);
+                Tac::If {
+                    op: BinaryOperator::Ne,
+                    left: literal,
+                    right: Operand::NumberLiteral { value: 0 },
+                    label,
+                }
+            }
+            ast::Expression::StringLiteral(literal) => {
+                // FIXME: is this correct? Probably not
+                let literal = self.visit_string_literal(literal);
+                Tac::If {
+                    op: BinaryOperator::Ne,
+                    left: literal,
+                    right: Operand::NumberLiteral { value: 0 },
+                    label,
+                }
+            }
+            ast::Expression::Variable(var) => {
+                let var = self.visit_variable(var);
+                Tac::If {
+                    op: BinaryOperator::Ne,
+                    left: var,
+                    right: Operand::NumberLiteral { value: 0 },
+                    label,
+                }
+            }
+            ast::Expression::BinaryOp { left, op, right } => {
+                let left = left.accept(self);
+                let right = right.accept(self);
+
+                Tac::If {
+                    op: Self::negate_comparison(BinaryOperator::from(*op)),
+                    left,
+                    right,
+                    label,
+                }
+            }
+        };
+
+        self.hir.push(if_);
 
         then.accept(self);
 
