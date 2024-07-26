@@ -6,7 +6,7 @@ mod semantic_check;
 mod symbol_table;
 
 pub use ast_printer::AstPrintVisitor;
-pub use parser::Parser;
+pub use parser::AstBuilder;
 pub use semantic_check::SemanticCheckVisitor;
 pub use symbol_table::{SymbolTable, SymbolTableBuilderVisitor, Ty};
 

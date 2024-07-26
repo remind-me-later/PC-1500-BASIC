@@ -9,27 +9,18 @@ use nom::{
     IResult,
 };
 use std::{cell::RefCell, collections::HashMap, str::FromStr};
-use typed_arena::Arena;
 
-pub struct Parser<'parser> {
-    stmt_arena: &'parser Arena<Statement<'parser>>,
-    expr_arena: &'parser Arena<Expression<'parser>>,
-    str_arena: &'parser Arena<String>,
+pub struct AstBuilder<'parser> {
+    bump: &'parser bumpalo::Bump,
 
     str_map: RefCell<HashMap<&'parser str, &'parser str>>,
     expr_map: RefCell<HashMap<&'parser Expression<'parser>, &'parser Expression<'parser>>>,
 }
 
-impl<'parser> Parser<'parser> {
-    pub fn new(
-        stmt_arena: &'parser Arena<Statement<'parser>>,
-        expr_arena: &'parser Arena<Expression<'parser>>,
-        str_arena: &'parser Arena<String>,
-    ) -> Self {
+impl<'parser> AstBuilder<'parser> {
+    pub fn new(bump: &'parser bumpalo::Bump) -> Self {
         Self {
-            stmt_arena,
-            expr_arena,
-            str_arena,
+            bump,
             str_map: RefCell::new(HashMap::new()),
             expr_map: RefCell::new(HashMap::new()),
         }
@@ -39,7 +30,7 @@ impl<'parser> Parser<'parser> {
         if self.str_map.borrow().contains_key(s) {
             self.str_map.borrow().get(s).unwrap()
         } else {
-            let s = self.str_arena.alloc(s.to_string());
+            let s = self.bump.alloc(s.to_string());
             self.str_map.borrow_mut().insert(s, s);
             s
         }
@@ -49,7 +40,7 @@ impl<'parser> Parser<'parser> {
         if self.expr_map.borrow().contains_key(&expr) {
             self.expr_map.borrow().get(&expr).unwrap()
         } else {
-            let expr = self.expr_arena.alloc(expr);
+            let expr = self.bump.alloc(expr);
             self.expr_map.borrow_mut().insert(expr, expr);
             expr
         }
@@ -363,13 +354,13 @@ impl<'parser> Parser<'parser> {
         let (input, _) = space1(input)?;
 
         let (input, then) = self.parse_atomic_statement(input)?;
-        let then = self.stmt_arena.alloc(then);
+        let then = self.bump.alloc(then);
 
         let (input, else_) = opt(preceded(space1, move |i| {
             let (i, _) = tag("ELSE")(i)?;
             let (i, _) = space1(i)?;
             let (i, else_) = self.parse_atomic_statement(i)?;
-            let else_ = self.stmt_arena.alloc(else_);
+            let else_ = self.bump.alloc(else_);
             Ok((i, else_))
         }))(input)?;
 
