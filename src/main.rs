@@ -26,8 +26,9 @@ fn main() {
             // println!("Symbols:\n{}", symbol_table);
             let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
             type_checker.check().unwrap();
-            let hir_bump = bumpalo::Bump::new();
-            let hir = HirBuilder::new(&program, &hir_bump).build();
+            let hir = HirBuilder::new(&program).build();
+            drop(bump);
+
             println!("data:\n{:?}\n", hir.1);
             println!("start:\n{}", hir.0);
         }

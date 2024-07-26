@@ -51,7 +51,7 @@ impl std::fmt::Display for BinaryOperator {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Operand {
     Variable { id: u32 },
     IndirectVariable { id: u32 },
@@ -87,42 +87,18 @@ impl std::fmt::Display for Operand {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
-pub struct Expression<'a> {
-    left: &'a Operand,
-    op: BinaryOperator,
-    right: &'a Operand,
-    dest: &'a Operand,
-}
-
-impl std::fmt::Display for Expression<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} := {} {} {}",
-            self.dest, self.left, self.op, self.right
-        )
-    }
-}
-
-#[derive(PartialEq, Eq, Hash)]
-pub struct IfCondition<'a> {
-    left: &'a Operand,
-    op: BinaryOperator,
-    right: &'a Operand,
-}
-
-impl std::fmt::Display for IfCondition<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.left, self.op, self.right)
-    }
-}
-
-pub enum Tac<'a> {
-    Expression(&'a Expression<'a>),
+pub enum Tac {
+    // Expressions
+    BinExpression {
+        left: Operand,
+        op: BinaryOperator,
+        right: Operand,
+        dest: Operand,
+    },
+    // Copy
     Copy {
-        src: &'a Operand,
-        dest: &'a Operand,
+        src: Operand,
+        dest: Operand,
     },
     // Control flow
     Goto {
@@ -133,7 +109,9 @@ pub enum Tac<'a> {
     },
     Return,
     If {
-        condition: &'a IfCondition<'a>,
+        op: BinaryOperator,
+        left: Operand,
+        right: Operand,
         label: u32,
     },
     // Labels 0-100 are reserved for built-in functions
@@ -141,19 +119,33 @@ pub enum Tac<'a> {
         label: u32,
     },
     Param {
-        operand: &'a Operand,
+        operand: Operand,
     },
 }
 
-impl std::fmt::Display for Tac<'_> {
+impl std::fmt::Display for Tac {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Tac::Copy { src, dest } => write!(f, "{} := {}", dest, src),
-            Tac::Expression(expr) => write!(f, "{}", expr),
+            Tac::BinExpression {
+                left,
+                op,
+                right,
+                dest,
+            } => {
+                write!(f, "{} := {} {} {}", dest, left, op, right)
+            }
             Tac::Goto { label } => write!(f, "goto l{}", label),
             Tac::Label { id } => write!(f, "l{}", id),
             Tac::Return => write!(f, "return"),
-            Tac::If { condition, label } => write!(f, "if {} goto l{}", condition, label),
+            Tac::If {
+                op,
+                left,
+                right,
+                label,
+            } => {
+                write!(f, "if {} {} {} goto l{}", left, op, right, label)
+            }
             Tac::Call { label } => match *label {
                 PRINT_PTR_LABEL => write!(f, "call print_ptr"),
                 INPUT_PTR_LABEL => write!(f, "call input_ptr"),
@@ -167,11 +159,17 @@ impl std::fmt::Display for Tac<'_> {
     }
 }
 
-pub struct Program<'a> {
-    hir: Vec<Tac<'a>>,
+pub struct Program {
+    hir: Vec<Tac>,
 }
 
-impl std::fmt::Display for Program<'_> {
+impl Program {
+    pub fn iter(&self) -> std::slice::Iter<'_, Tac> {
+        self.hir.iter()
+    }
+}
+
+impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for hir in &self.hir {
             match hir {
@@ -191,32 +189,48 @@ pub trait ProgramVisitor {
     fn visit_program(&mut self, program: &mut Program);
 }
 
-impl<'a> Program<'a> {
+impl Program {
     pub fn accept<V: ProgramVisitor>(&mut self, visitor: &mut V) {
         visitor.visit_program(self);
     }
 }
 
 pub trait TacVisitor {
-    fn visit_expression(&mut self, expr: &Expression);
+    fn visit_binary_expression(
+        &mut self,
+        left: &Operand,
+        op: BinaryOperator,
+        right: &Operand,
+        dest: &Operand,
+    );
     fn visit_copy(&mut self, src: &Operand, dest: &Operand);
     fn visit_goto(&mut self, label: u32);
     fn visit_label(&mut self, id: u32);
     fn visit_return(&mut self);
-    fn visit_if(&mut self, condition: &IfCondition, label: u32);
+    fn visit_if(&mut self, op: BinaryOperator, left: &Operand, right: &Operand, label: u32);
     fn visit_call(&mut self, label: u32);
     fn visit_param(&mut self, operand: &Operand);
 }
 
-impl<'a> Tac<'a> {
+impl Tac {
     pub fn accept<V: TacVisitor>(&self, visitor: &mut V) {
         match self {
-            Tac::Expression(expr) => visitor.visit_expression(expr),
+            Tac::BinExpression {
+                left,
+                op,
+                right,
+                dest,
+            } => visitor.visit_binary_expression(left, *op, right, dest),
             Tac::Copy { src, dest } => visitor.visit_copy(src, dest),
             Tac::Goto { label } => visitor.visit_goto(*label),
             Tac::Label { id } => visitor.visit_label(*id),
             Tac::Return => visitor.visit_return(),
-            Tac::If { condition, label } => visitor.visit_if(condition, *label),
+            Tac::If {
+                op,
+                left,
+                right,
+                label,
+            } => visitor.visit_if(*op, left, right, *label),
             Tac::Call { label } => visitor.visit_call(*label),
             Tac::Param { operand } => visitor.visit_param(operand),
         }

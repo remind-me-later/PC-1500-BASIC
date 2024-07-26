@@ -6,8 +6,7 @@ use crate::{
 };
 
 use super::{
-    BinaryOperator, Expression, IfCondition, Operand, Program, Tac, END_OF_BUILTIN_LABELS,
-    INPUT_VAL_LABEL, PRINT_VAL_LABEL,
+    BinaryOperator, Operand, Program, Tac, END_OF_BUILTIN_LABELS, INPUT_VAL_LABEL, PRINT_VAL_LABEL,
 };
 
 struct ForInfo<'a> {
@@ -17,13 +16,12 @@ struct ForInfo<'a> {
 }
 
 pub struct HirBuilder<'a> {
-    hir: Vec<Tac<'a>>,
-    bump: &'a bumpalo::Bump,
+    hir: Vec<Tac>,
 
     program: &'a ast::Program<'a>,
 
-    var_map: HashMap<&'a str, &'a Operand>,
-    expr_map: HashMap<&'a ast::Expression<'a>, &'a Operand>,
+    var_map: HashMap<&'a str, Operand>,
+    expr_map: HashMap<&'a ast::Expression<'a>, Operand>,
 
     str_map: HashMap<&'a str, usize>,
     str_literals: Vec<String>,
@@ -38,7 +36,7 @@ pub struct HirBuilder<'a> {
 }
 
 impl<'a> HirBuilder<'a> {
-    pub fn new(program: &'a ast::Program<'a>, bump: &'a bumpalo::Bump) -> Self {
+    pub fn new(program: &'a ast::Program<'a>) -> Self {
         Self {
             program,
             hir: Vec::new(),
@@ -51,11 +49,10 @@ impl<'a> HirBuilder<'a> {
             str_map: HashMap::new(),
             str_literals: Vec::new(),
             goto_list: Vec::new(),
-            bump,
         }
     }
 
-    pub fn build(mut self) -> (Program<'a>, Vec<String>) {
+    pub fn build(mut self) -> (Program, Vec<String>) {
         self.program.accept(&mut self);
         let program = Program { hir: self.hir };
         (program, self.str_literals)
@@ -86,20 +83,20 @@ impl<'a> HirBuilder<'a> {
     }
 }
 
-impl<'a> ast::ExpressionVisitor<'a, &'a Operand> for HirBuilder<'a> {
-    fn visit_number_literal(&mut self, value: i32) -> &'a Operand {
-        self.bump.alloc(Operand::NumberLiteral { value })
+impl<'a> ast::ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
+    fn visit_number_literal(&mut self, value: i32) -> Operand {
+        Operand::NumberLiteral { value }
     }
 
-    fn visit_string_literal(&mut self, content: &'a str) -> &'a Operand {
+    fn visit_string_literal(&mut self, content: &'a str) -> Operand {
         let index = self.insert_str_literal(content);
 
-        self.bump.alloc(Operand::IndirectNumberLiteral {
+        Operand::IndirectNumberLiteral {
             value: index as i32,
-        })
+        }
     }
 
-    fn visit_variable(&mut self, variable: &'a str) -> &'a Operand {
+    fn visit_variable(&mut self, variable: &'a str) -> Operand {
         if let Some(&id) = self.var_map.get(variable) {
             id
         } else {
@@ -110,7 +107,6 @@ impl<'a> ast::ExpressionVisitor<'a, &'a Operand> for HirBuilder<'a> {
             } else {
                 Operand::Variable { id }
             };
-            let var = self.bump.alloc(var);
 
             self.var_map.insert(variable, var);
 
@@ -123,7 +119,7 @@ impl<'a> ast::ExpressionVisitor<'a, &'a Operand> for HirBuilder<'a> {
         left: &'a ast::Expression<'a>,
         op: ast::BinaryOperator,
         right: &'a ast::Expression<'a>,
-    ) -> &'a Operand {
+    ) -> Operand {
         let left_op = if let Some(&id) = self.expr_map.get(left) {
             id
         } else {
@@ -141,87 +137,86 @@ impl<'a> ast::ExpressionVisitor<'a, &'a Operand> for HirBuilder<'a> {
         };
 
         // TODO: if string concatenation is allowed this has to change
-        let dest_op = self.bump.alloc(Operand::Variable {
+        let dest_op = Operand::Variable {
             id: self.get_next_variable_id(),
-        });
+        };
 
         let expr = match op {
-            ast::BinaryOperator::Add => Expression {
+            ast::BinaryOperator::Add => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Add,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Sub => Expression {
+            ast::BinaryOperator::Sub => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Sub,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Mul => Expression {
+            ast::BinaryOperator::Mul => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Mul,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Div => Expression {
+            ast::BinaryOperator::Div => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Div,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::And => Expression {
+            ast::BinaryOperator::And => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::And,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Or => Expression {
+            ast::BinaryOperator::Or => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Or,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Eq => Expression {
+            ast::BinaryOperator::Eq => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Eq,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Ne => Expression {
+            ast::BinaryOperator::Ne => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Ne,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Lt => Expression {
+            ast::BinaryOperator::Lt => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Lt,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Le => Expression {
+            ast::BinaryOperator::Le => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Le,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Gt => Expression {
+            ast::BinaryOperator::Gt => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Gt,
                 right: right_op,
                 dest: dest_op,
             },
-            ast::BinaryOperator::Ge => Expression {
+            ast::BinaryOperator::Ge => Tac::BinExpression {
                 left: left_op,
                 op: BinaryOperator::Ge,
                 right: right_op,
                 dest: dest_op,
             },
         };
-        let expr = self.bump.alloc(expr);
 
-        self.hir.push(Tac::Expression(expr));
+        self.hir.push(expr);
         self.expr_map.insert(left, dest_op);
 
         dest_op
@@ -326,11 +321,9 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         });
 
         self.hir.push(Tac::If {
-            condition: self.bump.alloc(IfCondition {
-                left: index,
-                op: BinaryOperator::Ge,
-                right: to,
-            }),
+            op: BinaryOperator::Ge,
+            left: index,
+            right: to,
             label: info.end_label,
         });
 
@@ -343,20 +336,20 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
 
         if let Some(step) = info.step {
             let step = step.accept(self);
-            self.hir.push(Tac::Expression(self.bump.alloc(Expression {
+            self.hir.push(Tac::BinExpression {
                 left: index,
                 op: BinaryOperator::Add,
                 right: step,
                 dest: index,
-            })));
+            });
         } else {
             // Add 1 to the index variable
-            self.hir.push(Tac::Expression(self.bump.alloc(Expression {
+            self.hir.push(Tac::BinExpression {
                 left: index,
                 op: BinaryOperator::Add,
-                right: self.bump.alloc(Operand::NumberLiteral { value: 1 }),
+                right: Operand::NumberLiteral { value: 1 },
                 dest: index,
-            })));
+            });
         }
 
         self.hir.push(Tac::Goto {
@@ -379,21 +372,22 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
         self.hir.push(Tac::Return);
     }
 
+    // FIXME: horrible branching
     fn visit_if(
         &mut self,
         condition: &ast::Expression<'a>,
         then: &'a ast::Statement<'a>,
         else_: Option<&'a ast::Statement<'a>>,
     ) {
-        let condition = self.bump.alloc(IfCondition {
-            left: condition.accept(self),
-            op: BinaryOperator::Ne,
-            right: self.bump.alloc(Operand::NumberLiteral { value: 0 }),
-        });
-
+        let left = condition.accept(self);
         let label = self.get_next_label();
 
-        self.hir.push(Tac::If { condition, label });
+        self.hir.push(Tac::If {
+            op: BinaryOperator::Ne,
+            left,
+            right: Operand::NumberLiteral { value: 0 },
+            label,
+        });
 
         then.accept(self);
 
