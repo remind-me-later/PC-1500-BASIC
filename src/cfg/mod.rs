@@ -150,6 +150,8 @@ impl BasicBlock {
                         new_tacs.push(Tac::Param {
                             operand: Operand::NumberLiteral { value: *val },
                         });
+                    } else {
+                        new_tacs.push(Tac::Param { operand: *operand });
                     }
                 }
 
@@ -176,7 +178,14 @@ impl std::fmt::Display for BasicBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "--- BB:{} ---", self.id)?;
         for tac in &self.tacs {
-            writeln!(f, "\t{}", tac)?;
+            match tac {
+                Tac::Label { .. } => {
+                    writeln!(f, "{}:", tac)?;
+                }
+                _ => {
+                    writeln!(f, "\t{}", tac)?;
+                }
+            }
         }
         Ok(())
     }

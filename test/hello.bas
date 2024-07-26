@@ -1,6 +1,7 @@
 5 REM Hello, World! in BASIC
-7 X = 1
-8 Y = X + 2
+6 X = 1
+7 Y = X + 2
+8 PRINT "X = "; X; "Y = "; Y
 9 GOSUB 65
 10 N=10
 15 INPUT "What is your name? "; NAME$
