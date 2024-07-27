@@ -75,6 +75,8 @@ impl From<ast::BinaryOperator> for BinaryOperator {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum Operand {
+    TempVariable { id: u32 },
+    // IndirectTemp { id: u32 },
     Variable { id: u32 },
     IndirectVariable { id: u32 },
 
@@ -101,6 +103,7 @@ impl Operand {
 impl std::fmt::Display for Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Operand::TempVariable { id } => write!(f, "t{}", id),
             Operand::Variable { id } => write!(f, "v{}", id),
             Operand::NumberLiteral { value } => write!(f, "{}", value),
             Operand::IndirectVariable { id } => write!(f, "*v{}", id),
@@ -286,6 +289,7 @@ impl Tac {
 }
 
 pub trait OperandVisitor {
+    fn visit_temp_variable(&mut self, id: u32);
     fn visit_variable(&mut self, id: u32);
     fn visit_indirect_variable(&mut self, id: u32);
     fn visit_number_literal(&mut self, value: i32);
@@ -295,6 +299,7 @@ pub trait OperandVisitor {
 impl Operand {
     pub fn accept<V: OperandVisitor>(&self, visitor: &mut V) {
         match self {
+            Operand::TempVariable { id } => visitor.visit_temp_variable(*id),
             Operand::Variable { id } => visitor.visit_variable(*id),
             Operand::IndirectVariable { id } => visitor.visit_indirect_variable(*id),
             Operand::NumberLiteral { value } => visitor.visit_number_literal(*value),

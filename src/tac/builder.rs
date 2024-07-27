@@ -32,6 +32,7 @@ pub struct Builder<'a> {
     goto_list: Vec<usize>,
 
     next_variable: u32,
+    next_temp: u32,
     next_label: u32,
 }
 
@@ -49,6 +50,7 @@ impl<'a> Builder<'a> {
             str_map: HashMap::new(),
             str_literals: Vec::new(),
             goto_list: Vec::new(),
+            next_temp: 0,
         }
     }
 
@@ -61,6 +63,12 @@ impl<'a> Builder<'a> {
     fn get_next_variable_id(&mut self) -> u32 {
         let id = self.next_variable;
         self.next_variable += 1;
+        id
+    }
+
+    fn get_next_temp_id(&mut self) -> u32 {
+        let id = self.next_temp;
+        self.next_temp += 1;
         id
     }
 
@@ -149,8 +157,8 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
         };
 
         // TODO: if string concatenation is allowed this has to change
-        let dest_op = Operand::Variable {
-            id: self.get_next_variable_id(),
+        let dest_op = Operand::TempVariable {
+            id: self.get_next_temp_id(),
         };
 
         self.hir.push(Tac::BinExpression {
@@ -180,7 +188,9 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             self.hir.push(Tac::Param { operand });
 
             match operand {
-                Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
+                Operand::TempVariable { .. }
+                | Operand::Variable { .. }
+                | Operand::NumberLiteral { .. } => {
                     self.hir.push(Tac::ExternCall {
                         label: PRINT_VAL_LABEL,
                     });
@@ -200,7 +210,9 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             self.hir.push(Tac::Param { operand: prompt });
 
             match prompt {
-                Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
+                Operand::TempVariable { .. }
+                | Operand::Variable { .. }
+                | Operand::NumberLiteral { .. } => {
                     self.hir.push(Tac::ExternCall {
                         label: PRINT_VAL_LABEL,
                     });
@@ -217,7 +229,9 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         self.hir.push(Tac::Param { operand: dest });
 
         match dest {
-            Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
+            Operand::TempVariable { .. }
+            | Operand::Variable { .. }
+            | Operand::NumberLiteral { .. } => {
                 self.hir.push(Tac::ExternCall {
                     label: INPUT_VAL_LABEL,
                 });
