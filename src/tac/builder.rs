@@ -13,16 +13,16 @@ use super::{
 struct ForInfo<'a> {
     begin_label: u32,
     end_label: u32,
-    step: Option<&'a ast::Expression<'a>>,
+    step: Option<&'a ast::Expression>,
 }
 
 pub struct Builder<'a> {
     hir: Vec<Tac>,
 
-    program: &'a ast::Program<'a>,
+    program: &'a ast::Program,
 
     var_map: HashMap<&'a str, Operand>,
-    expr_map: HashMap<&'a ast::Expression<'a>, Operand>,
+    expr_map: HashMap<&'a ast::Expression, Operand>,
 
     str_map: HashMap<&'a str, usize>,
     str_literals: Vec<String>,
@@ -38,7 +38,7 @@ pub struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
-    pub fn new(program: &'a ast::Program<'a>) -> Self {
+    pub fn new(program: &'a ast::Program) -> Self {
         Self {
             program,
             hir: Vec::new(),
@@ -125,9 +125,9 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
 
     fn visit_binary_op(
         &mut self,
-        left: &'a ast::Expression<'a>,
+        left: &'a ast::Expression,
         op: ast::BinaryOperator,
-        right: &'a ast::Expression<'a>,
+        right: &'a ast::Expression,
     ) -> Operand {
         let left_op = if let Some(&id) = self.expr_map.get(left) {
             id
@@ -163,14 +163,14 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
 }
 
 impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &ast::Expression<'a>) {
+    fn visit_let(&mut self, variable: &'a str, expression: &'a ast::Expression) {
         let dest = self.visit_variable(variable);
         let src = expression.accept(self);
 
         self.hir.push(Tac::Copy { src, dest });
     }
 
-    fn visit_print(&mut self, content: &'a [&'a ast::Expression<'a>]) {
+    fn visit_print(&mut self, content: &'a [ast::Expression]) {
         // TODO: maybe print all together? How?
         for item in content {
             let operand = item.accept(self);
@@ -193,7 +193,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         }
     }
 
-    fn visit_input(&mut self, prompt: Option<&'a ast::Expression<'a>>, variable: &'a str) {
+    fn visit_input(&mut self, prompt: Option<&'a ast::Expression>, variable: &'a str) {
         if let Some(prompt) = prompt {
             let prompt = prompt.accept(self);
             self.hir.push(Tac::Param { operand: prompt });
@@ -242,9 +242,9 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &ast::Expression<'a>,
-        to: &ast::Expression<'a>,
-        step: Option<&'a ast::Expression<'a>>,
+        from: &'a ast::Expression,
+        to: &'a ast::Expression,
+        step: Option<&'a ast::Expression>,
     ) {
         let index = self.visit_variable(variable);
         let from = from.accept(self);
@@ -320,9 +320,9 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
     // FIXME: horrible branching
     fn visit_if(
         &mut self,
-        condition: &ast::Expression<'a>,
-        then: &'a ast::Statement<'a>,
-        else_: Option<&'a ast::Statement<'a>>,
+        condition: &'a ast::Expression,
+        then: &'a ast::Statement,
+        else_: Option<&'a ast::Statement>,
     ) {
         let label = self.get_next_label();
 
@@ -383,7 +383,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [ast::Statement<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [ast::Statement]) {
         for stmt in statements {
             stmt.accept(self);
         }
@@ -391,7 +391,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
 }
 
 impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
-    fn visit_program(&mut self, program: &'a ast::Program<'a>) {
+    fn visit_program(&mut self, program: &'a ast::Program) {
         for (&line_number, stmt) in program.iter() {
             self.line_to_hir_map
                 .insert(line_number as usize, self.hir.len());

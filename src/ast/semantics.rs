@@ -19,14 +19,14 @@ impl std::fmt::Display for Ty {
 }
 
 pub struct SemanticChecker<'a> {
-    program: &'a Program<'a>,
+    program: &'a Program,
     errors: Vec<String>,
     // symbol_table: &'a SymbolTable<'a>,
     for_stack: Vec<&'a str>,
 }
 
 impl<'a> SemanticChecker<'a> {
-    pub fn new(program: &'a Program<'a>) -> Self {
+    pub fn new(program: &'a Program) -> Self {
         SemanticChecker {
             errors: Vec::new(),
             for_stack: Vec::new(),
@@ -64,9 +64,9 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
 
     fn visit_binary_op(
         &mut self,
-        left: &Expression<'a>,
+        left: &'a Expression,
         op: BinaryOperator,
-        right: &Expression<'a>,
+        right: &'a Expression,
     ) -> Ty {
         let left_ty = left.accept(self);
         let right_ty = right.accept(self);
@@ -110,7 +110,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>) {
+    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression) {
         let expr_ty = expression.accept(self);
         let expected_ty = self.get_ty(variable);
         if expr_ty != expected_ty {
@@ -121,13 +121,13 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         }
     }
 
-    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]) {
+    fn visit_print(&mut self, content: &'a [Expression]) {
         for item in content {
             item.accept(self);
         }
     }
 
-    fn visit_input(&mut self, _: Option<&Expression<'a>>, _: &'a str) {
+    fn visit_input(&mut self, _: Option<&'a Expression>, _: &'a str) {
         // TODO: check prompt is string? Are integer prompts allowed?
     }
 
@@ -142,9 +142,9 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &Expression<'a>,
-        to: &Expression<'a>,
-        step: Option<&Expression<'a>>,
+        from: &'a Expression,
+        to: &'a Expression,
+        step: Option<&'a Expression>,
     ) {
         let var_ty = self.get_ty(variable);
 
@@ -205,9 +205,9 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
 
     fn visit_if(
         &mut self,
-        condition: &Expression<'a>,
-        then: &'a Statement<'a>,
-        else_: Option<&'a Statement<'a>>,
+        condition: &'a Expression,
+        then: &'a Statement,
+        else_: Option<&'a Statement>,
     ) {
         let condition_ty = condition.accept(self);
         if condition_ty != Ty::Int {
@@ -220,7 +220,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [Statement<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [Statement]) {
         for statement in statements {
             statement.accept(self);
         }
@@ -228,7 +228,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
 }
 
 impl<'a> ProgramVisitor<'a> for SemanticChecker<'a> {
-    fn visit_program(&mut self, program: &'a super::Program<'a>) {
+    fn visit_program(&mut self, program: &'a Program) {
         for statement in program.values() {
             statement.accept(self);
         }

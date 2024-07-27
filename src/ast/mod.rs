@@ -51,19 +51,19 @@ impl std::fmt::Display for BinaryOperator {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum Expression<'a> {
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub enum Expression {
     NumberLiteral(i32),
-    StringLiteral(&'a str),
-    Variable(&'a str),
+    StringLiteral(String),
+    Variable(String),
     Binary {
-        left: &'a Expression<'a>,
+        left: Box<Expression>,
         op: BinaryOperator,
-        right: &'a Expression<'a>,
+        right: Box<Expression>,
     },
 }
 
-impl std::fmt::Display for Expression<'_> {
+impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::StringLiteral(content) => write!(f, "\"{}\"", content),
@@ -75,26 +75,26 @@ impl std::fmt::Display for Expression<'_> {
 }
 
 #[derive(Debug)]
-pub enum Statement<'a> {
+pub enum Statement {
     Let {
-        variable: &'a str,
-        expression: &'a Expression<'a>,
+        variable: String,
+        expression: Expression,
     },
     Print {
-        content: Vec<&'a Expression<'a>>,
+        content: Vec<Expression>,
     },
     Input {
-        prompt: Option<&'a Expression<'a>>,
-        variable: &'a str,
+        prompt: Option<Expression>,
+        variable: String,
     },
     For {
-        variable: &'a str,
-        from: &'a Expression<'a>,
-        to: &'a Expression<'a>,
-        step: Option<&'a Expression<'a>>,
+        variable: String,
+        from: Expression,
+        to: Expression,
+        step: Option<Expression>,
     },
     Next {
-        variable: &'a str,
+        variable: String,
     },
     Goto {
         line_number: u32,
@@ -105,40 +105,40 @@ pub enum Statement<'a> {
     },
     Return,
     If {
-        condition: &'a Expression<'a>,
-        then: &'a Statement<'a>,
-        else_: Option<&'a Statement<'a>>,
+        condition: Expression,
+        then: Box<Statement>,
+        else_: Option<Box<Statement>>,
     },
     Seq {
-        statements: Vec<Statement<'a>>,
+        statements: Vec<Statement>,
     },
 }
 
 #[derive(Debug)]
-pub struct Program<'a> {
-    pub lines: BTreeMap<u32, Statement<'a>>,
+pub struct Program {
+    pub lines: BTreeMap<u32, Statement>,
 }
 
-impl<'a> Program<'a> {
+impl Program {
     pub fn new() -> Self {
         Program {
             lines: BTreeMap::new(),
         }
     }
 
-    pub fn add_line(&mut self, line_number: u32, ast: Statement<'a>) {
+    pub fn add_line(&mut self, line_number: u32, ast: Statement) {
         self.lines.insert(line_number, ast);
     }
 
-    pub fn lookup_line(&self, line_number: u32) -> Option<&Statement<'a>> {
+    pub fn lookup_line(&self, line_number: u32) -> Option<&Statement> {
         self.lines.get(&line_number)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&u32, &Statement<'a>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&u32, &Statement)> {
         self.lines.iter()
     }
 
-    pub fn values(&self) -> impl Iterator<Item = &Statement<'a>> {
+    pub fn values(&self) -> impl Iterator<Item = &Statement> {
         self.lines.values()
     }
 }

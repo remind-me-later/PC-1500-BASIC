@@ -17,7 +17,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    pub fn build(self, ast: &'a Program<'a>) -> String {
+    pub fn build(self, ast: &'a Program) -> String {
         let mut visitor = Printer::new();
         ast.accept(&mut visitor);
         visitor.output
@@ -42,9 +42,9 @@ impl<'a> ExpressionVisitor<'a> for Printer<'a> {
 
     fn visit_binary_op(
         &mut self,
-        left: &Expression<'a>,
+        left: &'a Expression,
         op: super::BinaryOperator,
-        right: &Expression<'a>,
+        right: &'a Expression,
     ) {
         self.output.push('(');
         left.accept(self);
@@ -63,14 +63,14 @@ impl<'a> ExpressionVisitor<'a> for Printer<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for Printer<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>) {
+    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression) {
         self.output.push_str("LET ");
         self.output.push_str(variable);
         self.output.push_str(" = ");
         expression.accept(self);
     }
 
-    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]) {
+    fn visit_print(&mut self, content: &'a [Expression]) {
         self.output.push_str("PRINT ");
         for (i, item) in content.iter().enumerate() {
             if i > 0 {
@@ -80,7 +80,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
-    fn visit_input(&mut self, prompt: Option<&'a Expression<'a>>, variable: &'a str) {
+    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) {
         self.output.push_str("INPUT ");
         if let Some(prompt) = prompt {
             self.output.push('"');
@@ -99,9 +99,9 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &Expression<'a>,
-        to: &Expression<'a>,
-        step: Option<&Expression<'a>>,
+        from: &'a Expression,
+        to: &'a Expression,
+        step: Option<&'a Expression>,
     ) {
         self.output.push_str("FOR ");
         self.output.push_str(variable);
@@ -138,9 +138,9 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
 
     fn visit_if(
         &mut self,
-        condition: &Expression<'a>,
-        then: &'a Statement<'a>,
-        else_: Option<&'a Statement<'a>>,
+        condition: &'a Expression,
+        then: &'a Statement,
+        else_: Option<&'a Statement>,
     ) {
         self.output.push_str("IF ");
         condition.accept(self);
@@ -152,7 +152,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
-    fn visit_seq(&mut self, statements: &'a [Statement<'a>]) {
+    fn visit_seq(&mut self, statements: &'a [Statement]) {
         // colon separated list
         self.output.push('(');
         for (i, statement) in statements.iter().enumerate() {
@@ -166,7 +166,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
 }
 
 impl<'a> ProgramVisitor<'a> for Printer<'a> {
-    fn visit_program(&mut self, program: &'a Program<'a>) {
+    fn visit_program(&mut self, program: &'a Program) {
         for (line_number, ast) in program.iter() {
             // print line number and then indent
             // 10 LET a = 1

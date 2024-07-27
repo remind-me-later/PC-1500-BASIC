@@ -6,14 +6,14 @@ pub trait ExpressionVisitor<'a, RetTy = ()> {
     fn visit_variable(&mut self, variable: &'a str) -> RetTy;
     fn visit_binary_op(
         &mut self,
-        left: &'a Expression<'a>,
+        left: &'a Expression,
         op: BinaryOperator,
-        right: &'a Expression<'a>,
+        right: &'a Expression,
     ) -> RetTy;
 }
 
-impl<'a> Expression<'a> {
-    pub fn accept<V: ExpressionVisitor<'a, RetTy>, RetTy>(&self, visitor: &mut V) -> RetTy {
+impl<'a> Expression {
+    pub fn accept<V: ExpressionVisitor<'a, RetTy>, RetTy>(&'a self, visitor: &mut V) -> RetTy {
         match self {
             Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
             Expression::StringLiteral(content) => visitor.visit_string_literal(content),
@@ -24,16 +24,16 @@ impl<'a> Expression<'a> {
 }
 
 pub trait StatementVisitor<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>);
-    fn visit_print(&mut self, content: &'a [&'a Expression<'a>]);
-    fn visit_input(&mut self, prompt: Option<&'a Expression<'a>>, variable: &'a str);
+    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression);
+    fn visit_print(&mut self, content: &'a [Expression]);
+    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str);
     fn visit_goto(&mut self, line_number: u32);
     fn visit_for(
         &mut self,
         variable: &'a str,
-        from: &'a Expression<'a>,
-        to: &'a Expression<'a>,
-        step: Option<&'a Expression<'a>>,
+        from: &'a Expression,
+        to: &'a Expression,
+        step: Option<&'a Expression>,
     );
     fn visit_next(&mut self, variable: &'a str);
     fn visit_end(&mut self);
@@ -41,14 +41,14 @@ pub trait StatementVisitor<'a> {
     fn visit_return(&mut self);
     fn visit_if(
         &mut self,
-        condition: &Expression<'a>,
-        then: &'a Statement<'a>,
-        else_: Option<&'a Statement<'a>>,
+        condition: &'a Expression,
+        then: &'a Statement,
+        else_: Option<&'a Statement>,
     );
-    fn visit_seq(&mut self, statements: &'a [Statement<'a>]);
+    fn visit_seq(&mut self, statements: &'a [Statement]);
 }
 
-impl<'a> Statement<'a> {
+impl<'a> Statement {
     pub fn accept<V: StatementVisitor<'a>>(&'a self, visitor: &mut V) {
         match self {
             Statement::Let {
@@ -56,16 +56,14 @@ impl<'a> Statement<'a> {
                 expression,
             } => visitor.visit_let(variable, expression),
             Statement::Print { content } => visitor.visit_print(content.as_slice()),
-            Statement::Input { prompt, variable } => {
-                visitor.visit_input(prompt.as_deref(), variable)
-            }
+            Statement::Input { prompt, variable } => visitor.visit_input(prompt.as_ref(), variable),
             Statement::Goto { line_number } => visitor.visit_goto(*line_number),
             Statement::For {
                 variable,
                 from,
                 to,
                 step,
-            } => visitor.visit_for(variable, from, to, *step),
+            } => visitor.visit_for(variable, from, to, step.as_ref()),
             Statement::Next { variable } => visitor.visit_next(variable),
             Statement::End => visitor.visit_end(),
             Statement::GoSub { line_number } => visitor.visit_gosub(*line_number),
@@ -81,10 +79,10 @@ impl<'a> Statement<'a> {
 }
 
 pub trait ProgramVisitor<'a> {
-    fn visit_program(&mut self, program: &'a Program<'a>);
+    fn visit_program(&mut self, program: &'a Program);
 }
 
-impl<'a> Program<'a> {
+impl<'a> Program {
     pub fn accept<V: ProgramVisitor<'a>>(&'a self, visitor: &mut V) {
         visitor.visit_program(self);
     }
