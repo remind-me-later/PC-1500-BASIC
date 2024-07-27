@@ -2,15 +2,15 @@ use std::marker::PhantomData;
 
 use super::{Expression, ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor};
 
-pub struct AstPrintVisitor<'a> {
+pub struct Printer<'a> {
     indent: usize,
     output: String,
     _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a> AstPrintVisitor<'a> {
+impl<'a> Printer<'a> {
     pub fn new() -> Self {
-        AstPrintVisitor {
+        Printer {
             indent: 0,
             output: String::new(),
             _phantom: PhantomData,
@@ -18,7 +18,7 @@ impl<'a> AstPrintVisitor<'a> {
     }
 
     pub fn build(self, ast: &'a Program<'a>) -> String {
-        let mut visitor = AstPrintVisitor::new();
+        let mut visitor = Printer::new();
         ast.accept(&mut visitor);
         visitor.output
     }
@@ -31,7 +31,7 @@ impl<'a> AstPrintVisitor<'a> {
     }
 }
 
-impl<'a> ExpressionVisitor<'a> for AstPrintVisitor<'a> {
+impl<'a> ExpressionVisitor<'a> for Printer<'a> {
     fn visit_number_literal(&mut self, num: i32) {
         self.output.push_str(&num.to_string());
     }
@@ -62,7 +62,7 @@ impl<'a> ExpressionVisitor<'a> for AstPrintVisitor<'a> {
     }
 }
 
-impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
+impl<'a> StatementVisitor<'a> for Printer<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>) {
         self.output.push_str("LET ");
         self.output.push_str(variable);
@@ -165,7 +165,7 @@ impl<'a> StatementVisitor<'a> for AstPrintVisitor<'a> {
     }
 }
 
-impl<'a> ProgramVisitor<'a> for AstPrintVisitor<'a> {
+impl<'a> ProgramVisitor<'a> for Printer<'a> {
     fn visit_program(&mut self, program: &'a Program<'a>) {
         for (line_number, ast) in program.iter() {
             // print line number and then indent

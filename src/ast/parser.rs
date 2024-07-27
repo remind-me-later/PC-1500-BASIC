@@ -10,12 +10,12 @@ use nom::{
 };
 use std::str::FromStr;
 
-pub struct AstBuilder<'parser> {
+pub struct Parser<'parser> {
     bump: bumpalo::Bump,
     phantom: std::marker::PhantomData<&'parser ()>,
 }
 
-impl<'parser> AstBuilder<'parser> {
+impl<'parser> Parser<'parser> {
     pub fn new() -> Self {
         Self {
             bump: bumpalo::Bump::new(),

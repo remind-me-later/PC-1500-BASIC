@@ -4,16 +4,16 @@ use super::{
     StatementVisitor,
 };
 
-pub struct SemanticCheckVisitor<'a> {
+pub struct SemanticChecker<'a> {
     program: &'a Program<'a>,
     errors: Vec<String>,
     symbol_table: &'a SymbolTable<'a>,
     for_stack: Vec<&'a str>,
 }
 
-impl<'a> SemanticCheckVisitor<'a> {
+impl<'a> SemanticChecker<'a> {
     pub fn new(symbol_table: &'a SymbolTable<'a>, program: &'a Program<'a>) -> Self {
-        SemanticCheckVisitor {
+        SemanticChecker {
             errors: Vec::new(),
             for_stack: Vec::new(),
             program,
@@ -31,7 +31,7 @@ impl<'a> SemanticCheckVisitor<'a> {
     }
 }
 
-impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
+impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
     fn visit_variable(&mut self, name: &'a str) -> Ty {
         self.symbol_table.lookup(name).unwrap().ty()
     }
@@ -87,7 +87,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticCheckVisitor<'a> {
     }
 }
 
-impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
+impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>) {
         let expr_ty = expression.accept(self);
         let expected_ty = self.symbol_table.lookup(variable).unwrap().ty();
@@ -205,7 +205,7 @@ impl<'a> StatementVisitor<'a> for SemanticCheckVisitor<'a> {
     }
 }
 
-impl<'a> ProgramVisitor<'a> for SemanticCheckVisitor<'a> {
+impl<'a> ProgramVisitor<'a> for SemanticChecker<'a> {
     fn visit_program(&mut self, program: &'a super::Program<'a>) {
         for statement in program.values() {
             statement.accept(self);

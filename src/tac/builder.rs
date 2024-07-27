@@ -15,7 +15,7 @@ struct ForInfo<'a> {
     step: Option<&'a ast::Expression<'a>>,
 }
 
-pub struct HirBuilder<'a> {
+pub struct Builder<'a> {
     hir: Vec<Tac>,
 
     program: &'a ast::Program<'a>,
@@ -35,7 +35,7 @@ pub struct HirBuilder<'a> {
     next_label: u32,
 }
 
-impl<'a> HirBuilder<'a> {
+impl<'a> Builder<'a> {
     pub fn new(program: &'a ast::Program<'a>) -> Self {
         Self {
             program,
@@ -95,7 +95,7 @@ impl<'a> HirBuilder<'a> {
     }
 }
 
-impl<'a> ast::ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
+impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
     fn visit_number_literal(&mut self, value: i32) -> Operand {
         Operand::NumberLiteral { value }
     }
@@ -165,7 +165,7 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for HirBuilder<'a> {
     }
 }
 
-impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
+impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &ast::Expression<'a>) {
         let dest = self.visit_variable(variable);
         let src = expression.accept(self);
@@ -387,7 +387,7 @@ impl<'a> ast::StatementVisitor<'a> for HirBuilder<'a> {
     }
 }
 
-impl<'a> ast::ProgramVisitor<'a> for HirBuilder<'a> {
+impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
     fn visit_program(&mut self, program: &'a ast::Program<'a>) {
         // FIXME: very ugly hack, should implement extern definitions probably
         // but for testing should be fine

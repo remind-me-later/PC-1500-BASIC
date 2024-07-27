@@ -1,6 +1,6 @@
-mod tac_builder;
+mod builder;
 
-pub use tac_builder::HirBuilder;
+pub use builder::Builder;
 
 use crate::ast;
 

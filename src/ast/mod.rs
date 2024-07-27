@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
-mod ast_printer;
+mod printer;
 mod parser;
-mod semantic_check;
+mod semantics;
 mod symbol_table;
 
-pub use ast_printer::AstPrintVisitor;
-pub use parser::AstBuilder;
-pub use semantic_check::SemanticCheckVisitor;
+pub use printer::Printer;
+pub use parser::Parser;
+pub use semantics::SemanticChecker;
 pub use symbol_table::SymbolTableBuilderVisitor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
