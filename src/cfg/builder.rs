@@ -7,7 +7,7 @@ use std::{
     vec,
 };
 
-use crate::tac::{Operand, Program, ProgramVisitor, Tac, TacVisitor};
+use crate::tac::{ComparisonOperator, Operand, Program, ProgramVisitor, Tac, TacVisitor};
 
 use super::{BasicBlock, Cfg};
 
@@ -203,13 +203,7 @@ impl TacVisitor for Builder {
         self.new_block();
     }
 
-    fn visit_if(
-        &mut self,
-        op: crate::tac::BinaryOperator,
-        left: &Operand,
-        right: &Operand,
-        label: u32,
-    ) {
+    fn visit_if(&mut self, op: ComparisonOperator, left: &Operand, right: &Operand, label: u32) {
         let last_block_weak = Weak::clone(&self.current_block);
 
         {

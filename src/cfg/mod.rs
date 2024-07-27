@@ -79,13 +79,6 @@ impl BasicBlock {
                             crate::tac::BinaryOperator::Or => {
                                 (left_val != 0 || right_val != 0) as i32
                             }
-
-                            crate::tac::BinaryOperator::Eq => (left_val == right_val) as i32,
-                            crate::tac::BinaryOperator::Ne => (left_val != right_val) as i32,
-                            crate::tac::BinaryOperator::Lt => (left_val < right_val) as i32,
-                            crate::tac::BinaryOperator::Le => (left_val <= right_val) as i32,
-                            crate::tac::BinaryOperator::Gt => (left_val > right_val) as i32,
-                            crate::tac::BinaryOperator::Ge => (left_val >= right_val) as i32,
                         };
 
                         var_val.insert(*dest, result);
@@ -167,13 +160,12 @@ impl BasicBlock {
                         }),
                     ) {
                         let result = match op {
-                            crate::tac::BinaryOperator::Eq => (left_val == right_val) as i32,
-                            crate::tac::BinaryOperator::Ne => (left_val != right_val) as i32,
-                            crate::tac::BinaryOperator::Lt => (left_val < right_val) as i32,
-                            crate::tac::BinaryOperator::Le => (left_val <= right_val) as i32,
-                            crate::tac::BinaryOperator::Gt => (left_val > right_val) as i32,
-                            crate::tac::BinaryOperator::Ge => (left_val >= right_val) as i32,
-                            _ => unreachable!(),
+                            crate::tac::ComparisonOperator::Eq => (left_val == right_val) as i32,
+                            crate::tac::ComparisonOperator::Ne => (left_val != right_val) as i32,
+                            crate::tac::ComparisonOperator::Lt => (left_val < right_val) as i32,
+                            crate::tac::ComparisonOperator::Le => (left_val <= right_val) as i32,
+                            crate::tac::ComparisonOperator::Gt => (left_val > right_val) as i32,
+                            crate::tac::ComparisonOperator::Ge => (left_val >= right_val) as i32,
                         };
 
                         if result != 0 {

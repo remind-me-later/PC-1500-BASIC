@@ -6,7 +6,8 @@ use crate::{
 };
 
 use super::{
-    BinaryOperator, Operand, Program, Tac, END_OF_BUILTIN_LABELS, INPUT_VAL_LABEL, PRINT_VAL_LABEL,
+    BinaryOperator, ComparisonOperator, Operand, Program, Tac, END_OF_BUILTIN_LABELS,
+    INPUT_VAL_LABEL, PRINT_VAL_LABEL,
 };
 
 struct ForInfo<'a> {
@@ -87,18 +88,6 @@ impl<'a> Builder<'a> {
             self.str_literals.push(s.to_string());
             self.str_map.insert(s, id);
             id as u32
-        }
-    }
-
-    fn negate_comparison(op: BinaryOperator) -> BinaryOperator {
-        match op {
-            BinaryOperator::Eq => BinaryOperator::Ne,
-            BinaryOperator::Ne => BinaryOperator::Eq,
-            BinaryOperator::Lt => BinaryOperator::Ge,
-            BinaryOperator::Le => BinaryOperator::Gt,
-            BinaryOperator::Gt => BinaryOperator::Le,
-            BinaryOperator::Ge => BinaryOperator::Lt,
-            _ => unreachable!("Invalid comparison operator: {:?}", op),
         }
     }
 }
@@ -277,7 +266,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         });
 
         self.hir.push(Tac::If {
-            op: BinaryOperator::Ge,
+            op: ComparisonOperator::Ge,
             left: index,
             right: to,
             label: info.end_label,
@@ -341,7 +330,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             ast::Expression::NumberLiteral(val) => {
                 let literal = self.visit_number_literal(*val);
                 Tac::If {
-                    op: BinaryOperator::Ne,
+                    op: ComparisonOperator::Ne,
                     left: literal,
                     right: Operand::NumberLiteral { value: 0 },
                     label,
@@ -351,7 +340,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
                 // FIXME: is this correct? Probably not
                 let literal = self.visit_string_literal(literal);
                 Tac::If {
-                    op: BinaryOperator::Ne,
+                    op: ComparisonOperator::Ne,
                     left: literal,
                     right: Operand::NumberLiteral { value: 0 },
                     label,
@@ -360,7 +349,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             ast::Expression::Variable(var) => {
                 let var = self.visit_variable(var);
                 Tac::If {
-                    op: BinaryOperator::Ne,
+                    op: ComparisonOperator::Ne,
                     left: var,
                     right: Operand::NumberLiteral { value: 0 },
                     label,
@@ -371,7 +360,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
                 let right = right.accept(self);
 
                 Tac::If {
-                    op: Self::negate_comparison(BinaryOperator::from(*op)),
+                    op: ComparisonOperator::from(*op).negate(),
                     left,
                     right,
                     label,

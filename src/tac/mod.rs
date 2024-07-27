@@ -25,13 +25,6 @@ pub enum BinaryOperator {
     // Logical
     And,
     Or,
-    // Comparison
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
 }
 
 impl std::fmt::Display for BinaryOperator {
@@ -45,13 +38,6 @@ impl std::fmt::Display for BinaryOperator {
             // Logical
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Or => write!(f, "||"),
-            // Comparison
-            BinaryOperator::Eq => write!(f, "=="),
-            BinaryOperator::Ne => write!(f, "!="),
-            BinaryOperator::Lt => write!(f, "<"),
-            BinaryOperator::Le => write!(f, "<="),
-            BinaryOperator::Gt => write!(f, ">"),
-            BinaryOperator::Ge => write!(f, ">="),
         }
     }
 }
@@ -65,12 +51,71 @@ impl From<ast::BinaryOperator> for BinaryOperator {
             ast::BinaryOperator::Div => BinaryOperator::Div,
             ast::BinaryOperator::And => BinaryOperator::And,
             ast::BinaryOperator::Or => BinaryOperator::Or,
-            ast::BinaryOperator::Eq => BinaryOperator::Eq,
-            ast::BinaryOperator::Ne => BinaryOperator::Ne,
-            ast::BinaryOperator::Lt => BinaryOperator::Lt,
-            ast::BinaryOperator::Le => BinaryOperator::Le,
-            ast::BinaryOperator::Gt => BinaryOperator::Gt,
-            ast::BinaryOperator::Ge => BinaryOperator::Ge,
+            ast::BinaryOperator::Eq
+            | ast::BinaryOperator::Ne
+            | ast::BinaryOperator::Lt
+            | ast::BinaryOperator::Le
+            | ast::BinaryOperator::Gt
+            | ast::BinaryOperator::Ge => {
+                panic!("Invalid conversion from ast::BinaryOperator to tac::BinaryOperator")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ComparisonOperator {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+}
+
+impl ComparisonOperator {
+    pub fn negate(&self) -> Self {
+        match self {
+            ComparisonOperator::Eq => ComparisonOperator::Ne,
+            ComparisonOperator::Ne => ComparisonOperator::Eq,
+            ComparisonOperator::Lt => ComparisonOperator::Ge,
+            ComparisonOperator::Le => ComparisonOperator::Gt,
+            ComparisonOperator::Gt => ComparisonOperator::Le,
+            ComparisonOperator::Ge => ComparisonOperator::Lt,
+        }
+    }
+}
+
+impl std::fmt::Display for ComparisonOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ComparisonOperator::Eq => write!(f, "=="),
+            ComparisonOperator::Ne => write!(f, "!="),
+            ComparisonOperator::Lt => write!(f, "<"),
+            ComparisonOperator::Le => write!(f, "<="),
+            ComparisonOperator::Gt => write!(f, ">"),
+            ComparisonOperator::Ge => write!(f, ">="),
+        }
+    }
+}
+
+impl From<ast::BinaryOperator> for ComparisonOperator {
+    fn from(op: ast::BinaryOperator) -> Self {
+        match op {
+            ast::BinaryOperator::Eq => ComparisonOperator::Eq,
+            ast::BinaryOperator::Ne => ComparisonOperator::Ne,
+            ast::BinaryOperator::Lt => ComparisonOperator::Lt,
+            ast::BinaryOperator::Le => ComparisonOperator::Le,
+            ast::BinaryOperator::Gt => ComparisonOperator::Gt,
+            ast::BinaryOperator::Ge => ComparisonOperator::Ge,
+            ast::BinaryOperator::Add
+            | ast::BinaryOperator::Sub
+            | ast::BinaryOperator::Mul
+            | ast::BinaryOperator::Div
+            | ast::BinaryOperator::And
+            | ast::BinaryOperator::Or => {
+                panic!("Invalid conversion from ast::BinaryOperator to tac::ComparisonOperator")
+            }
         }
     }
 }
@@ -137,7 +182,7 @@ pub enum Tac {
     },
     Return,
     If {
-        op: BinaryOperator,
+        op: ComparisonOperator,
         left: Operand,
         right: Operand,
         label: u32,

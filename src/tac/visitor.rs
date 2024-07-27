@@ -1,4 +1,4 @@
-use super::{BinaryOperator, Operand, Program, Tac};
+use super::{BinaryOperator, ComparisonOperator, Operand, Program, Tac};
 
 pub trait ProgramVisitor {
     fn visit_program(&mut self, program: &mut Program);
@@ -22,7 +22,7 @@ pub trait TacVisitor {
     fn visit_goto(&mut self, label: u32);
     fn visit_label(&mut self, id: u32);
     fn visit_return(&mut self);
-    fn visit_if(&mut self, op: BinaryOperator, left: &Operand, right: &Operand, label: u32);
+    fn visit_if(&mut self, op: ComparisonOperator, left: &Operand, right: &Operand, label: u32);
     fn visit_call(&mut self, label: u32);
     fn visit_extern_call(&mut self, label: u32);
     fn visit_param(&mut self, operand: &Operand);
