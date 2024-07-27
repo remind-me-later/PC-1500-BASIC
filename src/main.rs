@@ -2,9 +2,6 @@ mod ast;
 mod cfg;
 mod tac;
 
-use ast::SemanticChecker;
-use tac::Builder;
-
 // TODO: use clap for argument parsing
 fn main() {
     // Read file from first argument
@@ -17,14 +14,14 @@ fn main() {
             let printer = ast::Printer::new();
             let output = printer.build(&program);
             println!("Ast:\n{}", output);
-            let type_checker = SemanticChecker::new(&program);
+            let type_checker = ast::SemanticChecker::new(&program);
             type_checker.check().unwrap();
-            let (hir, const_data) = Builder::new(&program).build();
+            let (tac, const_data) = tac::Builder::new(&program).build();
 
             println!("data:\n{:?}\n", const_data);
-            println!("start:\n{}", hir);
+            println!("start:\n{}", tac);
 
-            let mut cfg = cfg::CFGBuilder::new(hir).build();
+            let mut cfg = cfg::Builder::new(tac).build();
             // println!("Original cfg:\n{}", cfg);
             cfg.constant_fold();
             println!("Constant folded cfg:\n{}", cfg);

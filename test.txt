@@ -69,126 +69,124 @@ l24:
 	call exit
 
 Constant folded cfg:
-=== BB:0 ===
-print_val:
-	return
-==> <==
-
-=== BB:1 ===
+=== 1 ===
 print_ptr:
 	return
-==> <==
+==>  <==
 
-=== BB:2 ===
+=== 2 ===
 input_val:
 	return
-==> <==
+==>  <==
 
-=== BB:3 ===
+=== 3 ===
 input_ptr:
 	return
-==> <==
+==>  <==
 
-=== BB:4 ===
+=== 4 ===
 exit:
 	return
-==> <==
+==>  <==
 
-=== BB:5 ===
+=== 5 ===
 	param *0
 	call print_ptr
-==> BB:1 <==
+==>  <==
 
-=== BB:6 ===
+=== 6 ===
 	param v0
 	call input_val
-==> BB:2 <==
+==>  <==
 
-=== BB:7 ===
+=== 7 ===
 	if v0 >= 0 goto l20
-==> BB:10 BB:8 <==
+==> 8 <==
 
-=== BB:8 ===
+=== 8 ===
 	param *1
 	call print_ptr
-==> BB:1 <==
+==>  <==
 
-=== BB:9 ===
+=== 9 ===
 	call exit
-==> BB:4 <==
+==>  <==
 
-=== BB:10 ===
+=== 10 ===
 l20:
 	if v0 != 0 goto l21
-==> BB:13 BB:11 <==
+==> 11 <==
 
-=== BB:11 ===
+=== 11 ===
 	param *2
 	call print_ptr
-==> BB:1 <==
+==>  <==
 
-=== BB:12 ===
+=== 12 ===
 	call exit
-==> BB:4 <==
+==>  <==
 
-=== BB:13 ===
+=== 13 ===
 l21:
 	if v0 != 1 goto l22
-==> BB:16 BB:14 <==
+==> 14 <==
 
-=== BB:14 ===
+=== 14 ===
 	param *3
 	call print_ptr
-==> BB:1 <==
+==>  <==
 
-=== BB:15 ===
+=== 15 ===
 	call exit
-==> BB:4 <==
+==>  <==
 
-=== BB:16 ===
+=== 16 ===
 l22:
 	v1 := 0
 	v2 := 1
 	v3 := 2
-==> BB:17 <==
+==>  <==
 
-=== BB:17 ===
+=== 17 ===
 l23:
 	if v3 >= v0 goto l24
-==> BB:19 BB:18 <==
+==> 18 || 19 <==
 
-=== BB:18 ===
+=== 18 ===
 	v5 := v1 + v2
 	v4 := v5
 	v1 := v2
 	v2 := v4
 	v3 := v3 + 1
 	goto l23
-==> BB:17 <==
+==> 17 <==
 
-=== BB:19 ===
+=== 19 ===
 l24:
 	param *4
 	call print_ptr
-==> BB:1 <==
+==> 1 <==
 
-=== BB:20 ===
+=== 20 ===
 	param v0
 	call print_val
-==> BB:0 <==
+==> 0 <==
 
-=== BB:21 ===
+=== 21 ===
 	param *5
 	call print_ptr
-==> BB:1 <==
+==> 1 <==
 
-=== BB:22 ===
+=== 22 ===
 	param v4
 	call print_val
-==> BB:0 <==
+==> 0 <==
 
-=== BB:23 ===
+=== 23 ===
 	call exit
-==> BB:4 <==
+==> 4 <==
+
+=== 24 ===
+==>  <==
 
 

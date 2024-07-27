@@ -1,8 +1,10 @@
-use std::{collections::HashMap, mem};
+mod builder;
 
-use petgraph::graph::NodeIndex;
+pub use builder::Builder;
 
-use crate::tac::{Operand, Program, ProgramVisitor, Tac, TacVisitor};
+use std::collections::HashMap;
+
+use crate::tac::{Operand, Tac};
 
 #[derive(Debug, Clone, Copy)]
 pub enum FoldResult {
@@ -15,6 +17,8 @@ pub enum FoldResult {
 pub struct BasicBlock {
     pub id: u32,
     pub tacs: Vec<Tac>,
+    pub next_linear: Option<*mut BasicBlock>,
+    pub next_branch: Option<*mut BasicBlock>,
 }
 
 impl BasicBlock {
@@ -22,6 +26,8 @@ impl BasicBlock {
         BasicBlock {
             id,
             tacs: Vec::new(),
+            next_linear: None,
+            next_branch: None,
         }
     }
 
@@ -207,7 +213,7 @@ impl BasicBlock {
 
 impl std::fmt::Display for BasicBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "=== BB:{} ===", self.id)?;
+        writeln!(f, "=== {} ===", self.id)?;
         for tac in &self.tacs {
             match tac {
                 Tac::Label { .. } => {
@@ -218,270 +224,104 @@ impl std::fmt::Display for BasicBlock {
                 }
             }
         }
+
+        write!(f, "==> ")?;
+        if let (Some(next_linear), Some(next_branch)) = (self.next_linear, self.next_branch) {
+            let next_linear_id = unsafe { &*next_linear }.id;
+            let next_branch_id = unsafe { &*next_branch }.id;
+            write!(f, "{} || {}", next_linear_id, next_branch_id)?;
+        } else if let Some(next_linear) = self.next_linear {
+            let next_linear_id = unsafe { &*next_linear }.id;
+            write!(f, "{}", next_linear_id)?;
+        } else if let Some(next_branch) = self.next_branch {
+            let next_branch_id = unsafe { &*next_branch }.id;
+            write!(f, "{}", next_branch_id)?;
+        }
+        write!(f, " <==")?;
+
         Ok(())
     }
 }
 
 #[derive(Debug)]
 pub struct Cfg {
-    graph: petgraph::graph::DiGraph<BasicBlock, ()>,
+    arena: Vec<BasicBlock>,
+    head: *mut BasicBlock,
 }
 
 impl Cfg {
     pub fn constant_fold(&mut self) {
-        let mut indices = self.graph.node_indices().collect::<Vec<_>>();
+        // let mut indices = self.graph.node_indices().collect::<Vec<_>>();
 
-        while let Some(node) = indices.pop() {
-            let block = self.graph.node_weight_mut(node).unwrap();
-            let block_id = block.id;
-            let res = block.constant_fold();
-            match res {
-                FoldResult::Unchanged => {}
-                FoldResult::Linear => {
-                    let mut next = None;
-                    let neighbours = self.graph.neighbors(node).collect::<Vec<_>>();
+        // while let Some(node) = indices.pop() {
+        //     let block = self.graph.node_weight_mut(node).unwrap();
+        //     let block_id = block.id;
+        //     let res = block.constant_fold();
+        //     match res {
+        //         FoldResult::Unchanged => {}
+        //         FoldResult::Linear => {
+        //             let mut next = None;
+        //             let neighbours = self.graph.neighbors(node).collect::<Vec<_>>();
 
-                    for neighbour in neighbours {
-                        let neighbour_block = self.graph.node_weight(neighbour).unwrap();
-                        if neighbour_block.id == block_id + 1 {
-                            next = Some(neighbour);
-                        }
-                        let edge = self.graph.find_edge(node, neighbour).unwrap();
-                        self.graph.remove_edge(edge);
-                    }
+        //             for neighbour in neighbours {
+        //                 let neighbour_block = self.graph.node_weight(neighbour).unwrap();
+        //                 if neighbour_block.id == block_id + 1 {
+        //                     next = Some(neighbour);
+        //                 }
+        //                 let edge = self.graph.find_edge(node, neighbour).unwrap();
+        //                 self.graph.remove_edge(edge);
+        //             }
 
-                    if let Some(next) = next {
-                        let next_neighbours = self.graph.neighbors(next).collect::<Vec<_>>();
-                        let mut next_block = self.graph.remove_node(next).unwrap();
-                        indices.retain(|&idx| idx != next);
+        //             if let Some(next) = next {
+        //                 let next_neighbours = self.graph.neighbors(next).collect::<Vec<_>>();
+        //                 let mut next_block = self.graph.remove_node(next).unwrap();
+        //                 indices.retain(|&idx| idx != next);
 
-                        let block = self.graph.node_weight_mut(node).unwrap();
+        //                 let block = self.graph.node_weight_mut(node).unwrap();
 
-                        block.tacs.append(&mut next_block.tacs);
-                        for neighbour in next_neighbours {
-                            self.graph.add_edge(node, neighbour, ());
-                        }
-                    } else {
-                        unreachable!();
-                    }
-                }
-                FoldResult::Branch => {
-                    let mut next = None;
-                    let neighbours = self.graph.neighbors(node).collect::<Vec<_>>();
+        //                 block.tacs.append(&mut next_block.tacs);
+        //                 for neighbour in next_neighbours {
+        //                     self.graph.add_edge(node, neighbour, ());
+        //                 }
+        //             } else {
+        //                 unreachable!();
+        //             }
+        //         }
+        //         FoldResult::Branch => {
+        //             let mut next = None;
+        //             let neighbours = self.graph.neighbors(node).collect::<Vec<_>>();
 
-                    for neighbour in neighbours {
-                        let neighbour_block = self.graph.node_weight(neighbour).unwrap();
-                        if neighbour_block.id != block_id + 1 {
-                            next = Some(neighbour);
-                        }
-                        let edge = self.graph.find_edge(node, neighbour).unwrap();
-                        self.graph.remove_edge(edge);
-                    }
+        //             for neighbour in neighbours {
+        //                 let neighbour_block = self.graph.node_weight(neighbour).unwrap();
+        //                 if neighbour_block.id != block_id + 1 {
+        //                     next = Some(neighbour);
+        //                 }
+        //                 let edge = self.graph.find_edge(node, neighbour).unwrap();
+        //                 self.graph.remove_edge(edge);
+        //             }
 
-                    if let Some(next) = next {
-                        self.graph.add_edge(node, next, ());
-                    } else {
-                        unreachable!();
-                    }
-                }
-            }
-        }
+        //             if let Some(next) = next {
+        //                 self.graph.add_edge(node, next, ());
+        //             } else {
+        //                 unreachable!();
+        //             }
+        //         }
+        //     }
+        // }
 
-        // remove empty blocks
-        self.graph
-            .retain_nodes(|block, idx| !block.node_weight(idx).unwrap().tacs.is_empty());
+        // // remove empty blocks
+        // self.graph
+        //     .retain_nodes(|block, idx| !block.node_weight(idx).unwrap().tacs.is_empty());
+        // todo!()
     }
 }
 
 impl std::fmt::Display for Cfg {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for node in self.graph.node_indices() {
-            write!(f, "{}", self.graph[node])?;
-            let neighbours = self.graph.neighbors(node);
-            write!(f, "==> ")?;
-            for neighbour in neighbours {
-                write!(f, "BB:{} ", self.graph[neighbour].id)?;
-            }
-            writeln!(f, "<==")?;
-            writeln!(f)?;
+        for node in self.arena.iter() {
+            writeln!(f, "{}\n", node)?;
         }
 
         Ok(())
-    }
-}
-
-pub struct CFGBuilder {
-    program: Program,
-    next_id: u32,
-    current_block: NodeIndex,
-    graph: petgraph::graph::DiGraph<BasicBlock, ()>,
-    label_to_block: HashMap<u32, NodeIndex>,
-    branch_stack: Vec<(NodeIndex, u32)>,
-}
-
-impl CFGBuilder {
-    pub fn new(program: Program) -> Self {
-        let mut graph = petgraph::graph::DiGraph::new();
-        let current_block = graph.add_node(BasicBlock::new(0));
-
-        CFGBuilder {
-            program,
-            next_id: 1,
-            current_block,
-            graph,
-            label_to_block: HashMap::new(),
-            branch_stack: Vec::new(),
-        }
-    }
-
-    pub fn build(mut self) -> Cfg {
-        let mut program = mem::replace(&mut self.program, Program::new());
-        program.accept(&mut self);
-
-        Cfg { graph: self.graph }
-    }
-
-    fn new_block(&mut self) -> NodeIndex {
-        let current_block = self.graph.node_weight(self.current_block).unwrap();
-        if current_block.tacs.is_empty() {
-            return self.current_block;
-        }
-
-        let block = BasicBlock::new(self.next_id);
-        self.current_block = self.graph.add_node(block);
-        self.next_id += 1;
-        self.current_block
-    }
-}
-
-impl ProgramVisitor for CFGBuilder {
-    fn visit_program(&mut self, program: &mut Program) {
-        for tac in program.iter() {
-            tac.accept(self);
-        }
-
-        for (branch, label) in self.branch_stack.iter() {
-            let block = self.label_to_block.get(label).unwrap();
-            self.graph.add_edge(*branch, *block, ());
-        }
-    }
-}
-
-impl TacVisitor for CFGBuilder {
-    fn visit_binary_expression(
-        &mut self,
-        left: &Operand,
-        op: crate::tac::BinaryOperator,
-        right: &Operand,
-        dest: &Operand,
-    ) {
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::BinExpression {
-                left: *left,
-                op,
-                right: *right,
-                dest: *dest,
-            });
-    }
-
-    fn visit_copy(&mut self, src: &Operand, dest: &Operand) {
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::Copy {
-                src: *src,
-                dest: *dest,
-            });
-    }
-
-    fn visit_goto(&mut self, label: u32) {
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::Goto { label });
-
-        self.branch_stack.push((self.current_block, label));
-
-        self.new_block();
-    }
-
-    fn visit_label(&mut self, id: u32) {
-        let last_block_idx = self.current_block;
-        self.new_block();
-        let current_block_idx = self.current_block;
-
-        self.graph
-            .node_weight_mut(current_block_idx)
-            .unwrap()
-            .push(Tac::Label { id });
-
-        self.label_to_block.insert(id, current_block_idx);
-
-        if last_block_idx == current_block_idx {
-            return;
-        }
-
-        let last_block = self.graph.node_weight(last_block_idx).unwrap();
-
-        match last_block.tacs.last().unwrap() {
-            Tac::Goto { .. } | Tac::If { .. } | Tac::Call { .. } | Tac::Return => {}
-            _ => {
-                self.graph.add_edge(last_block_idx, current_block_idx, ());
-            }
-        }
-    }
-
-    fn visit_return(&mut self) {
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::Return);
-
-        self.new_block();
-    }
-
-    fn visit_if(
-        &mut self,
-        op: crate::tac::BinaryOperator,
-        left: &Operand,
-        right: &Operand,
-        label: u32,
-    ) {
-        let current_block_idx = self.current_block;
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::If {
-                op,
-                left: *left,
-                right: *right,
-                label,
-            });
-
-        self.branch_stack.push((self.current_block, label));
-
-        let new_block_idx = self.new_block();
-
-        self.graph.add_edge(current_block_idx, new_block_idx, ());
-    }
-
-    fn visit_call(&mut self, label: u32) {
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::Call { label });
-
-        self.branch_stack.push((self.current_block, label));
-
-        self.new_block();
-    }
-
-    fn visit_param(&mut self, operand: &Operand) {
-        self.graph
-            .node_weight_mut(self.current_block)
-            .unwrap()
-            .push(Tac::Param { operand: *operand });
     }
 }
