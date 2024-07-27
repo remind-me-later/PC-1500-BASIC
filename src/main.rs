@@ -1,3 +1,4 @@
+#[forbid(unsafe_code)]
 mod ast;
 mod cfg;
 mod tac;
