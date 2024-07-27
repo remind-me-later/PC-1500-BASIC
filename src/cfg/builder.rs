@@ -40,6 +40,31 @@ impl Builder {
         let mut program = mem::replace(&mut self.program, Program::new());
         program.accept(&mut self);
 
+        // TODO: kind of a hack but everything in this file is a hack
+        // remove the last block if it's empty
+        {
+            let is_empty = {
+                let upgraded = self.current_block.upgrade().unwrap();
+                let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
+                block.tacs.is_empty()
+            };
+
+            if is_empty {
+                self.arena.pop();
+
+                let upgraded = self.arena.last().unwrap();
+                let mut block = upgraded.borrow_mut();
+
+                let next_to = block.next_to.as_ref().map(Weak::clone);
+
+                if let Some(next_to) = next_to {
+                    if next_to.ptr_eq(&self.current_block) {
+                        block.next_to = None;
+                    }
+                }
+            }
+        }
+
         Cfg {
             head: self.head,
             arena: self.arena,

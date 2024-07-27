@@ -22,10 +22,10 @@ fn main() {
             println!("data:\n{:?}\n", const_data);
             println!("start:\n{}", tac);
 
-            let mut cfg = cfg::Builder::new(tac).build();
-            println!("Original cfg:\n{}", cfg);
-            cfg.constant_fold();
-            println!("Constant folded cfg:\n{}", cfg);
+            let cfg = cfg::Builder::new(tac).build();
+            println!("Original CFG:\n{}", cfg);
+            // cfg.constant_fold();
+            // println!("Constant folded cfg:\n{}", cfg);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }

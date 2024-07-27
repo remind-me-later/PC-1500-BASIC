@@ -233,16 +233,20 @@ impl std::fmt::Display for BasicBlock {
         if let Some(next_to) = &self.next_to {
             let upgraded = next_to.upgrade().unwrap();
             let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
-            write!(f, "next: {}", block.id)?;
+            write!(f, "next: {} ", block.id)?;
         }
 
         if let Some(branch_to) = &self.branch_to {
             let upgraded = branch_to.upgrade().unwrap();
             let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
-            write!(f, " branch: {}", block.id)?;
+            write!(f, "branch: {} ", block.id)?;
         }
 
-        write!(f, " <==")?;
+        if self.next_to.is_none() && self.branch_to.is_none() {
+            write!(f, "end ")?;
+        }
+
+        write!(f, "<==")?;
 
         Ok(())
     }
