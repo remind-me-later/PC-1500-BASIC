@@ -1,159 +1,67 @@
 Ast:
-10	INPUT ""Enter N: ""; N
-20	IF (N < 0) THEN (PRINT "N must be non-negative": END)
-30	IF (N = 0) THEN (PRINT "F(0) = 0": END)
-40	IF (N = 1) THEN (PRINT "F(1) = 1": END)
-50	LET A = 0
-60	LET B = 1
-70	FOR I = 2 TO N
-80		LET C = (A + B)
-90		LET A = B
-100		LET B = C
-110		NEXT I
-120	PRINT "F("; N; ") = "; C
-130	END
+10	LET X = 1
+20	IF (X = 1) THEN (LET X = 30: LET Y = 40: LET Z = 50)
+30	PRINT "Y = "; Y
 
 data:
-["Enter N: ", "N must be non-negative", "F(0) = 0", "F(1) = 1", "F(", ") = "]
+["Y = "]
 
 start:
+	v0 := 1
+	if v0 != 1 goto l20
+	v0 := 30
+	v1 := 40
+	v2 := 50
+l20:
 	param *0
 	extern_call print_ptr
-	param v0
-	extern_call input_val
-	if v0 >= 0 goto l20
-	param *1
-	extern_call print_ptr
-	extern_call exit
-l20:
-	if v0 != 0 goto l21
-	param *2
-	extern_call print_ptr
-	extern_call exit
-l21:
-	if v0 != 1 goto l22
-	param *3
-	extern_call print_ptr
-	extern_call exit
-l22:
-	v1 := 0
-	v2 := 1
-	v3 := 2
-l23:
-	if v3 >= v0 goto l24
-	t0 := v1 + v2
-	v4 := t0
-	v1 := v2
-	v2 := v4
-	v3 := v3 + 1
-	goto l23
-l24:
-	param *4
-	extern_call print_ptr
-	param v0
+	param v1
 	extern_call print_val
-	param *5
-	extern_call print_ptr
-	param v4
-	extern_call print_val
-	extern_call exit
 
 Original CFG:
 === 0 ===
-	param *0
-	extern_call print_ptr
-==> next: 1 <==
+	v0 := 1
+	if v0 != 1 goto l20
+==> next: 1 branch: 2 <==
 
 === 1 ===
-	param v0
-	extern_call input_val
+	v0 := 30
+	v1 := 40
+	v2 := 50
 ==> next: 2 <==
 
 === 2 ===
-	if v0 >= 0 goto l20
-==> next: 3 branch: 5 <==
+l20:
+	param *0
+	extern_call print_ptr
+==> next: 3 <==
 
 === 3 ===
-	param *1
-	extern_call print_ptr
-==> next: 4 <==
+	param v1
+	extern_call print_val
+==> end <==
 
-=== 4 ===
-	extern_call exit
-==> next: 5 <==
 
-=== 5 ===
+Constant folded cfg:
+=== 0 ===
+	v0 := 1
+==> next: 1 <==
+
+=== 1 ===
+	v0 := 30
+	v1 := 40
+	v2 := 50
+==> next: 2 <==
+
+=== 2 ===
 l20:
-	if v0 != 0 goto l21
-==> next: 6 branch: 8 <==
-
-=== 6 ===
-	param *2
+	param *0
 	extern_call print_ptr
-==> next: 7 <==
+==> next: 3 <==
 
-=== 7 ===
-	extern_call exit
-==> next: 8 <==
-
-=== 8 ===
-l21:
-	if v0 != 1 goto l22
-==> next: 9 branch: 11 <==
-
-=== 9 ===
-	param *3
-	extern_call print_ptr
-==> next: 10 <==
-
-=== 10 ===
-	extern_call exit
-==> next: 11 <==
-
-=== 11 ===
-l22:
-	v1 := 0
-	v2 := 1
-	v3 := 2
-==> next: 12 <==
-
-=== 12 ===
-l23:
-	if v3 >= v0 goto l24
-==> next: 13 branch: 14 <==
-
-=== 13 ===
-	t0 := v1 + v2
-	v4 := t0
-	v1 := v2
-	v2 := v4
-	v3 := v3 + 1
-	goto l23
-==> branch: 12 <==
-
-=== 14 ===
-l24:
-	param *4
-	extern_call print_ptr
-==> next: 15 <==
-
-=== 15 ===
-	param v0
+=== 3 ===
+	param v1
 	extern_call print_val
-==> next: 16 <==
-
-=== 16 ===
-	param *5
-	extern_call print_ptr
-==> next: 17 <==
-
-=== 17 ===
-	param v4
-	extern_call print_val
-==> next: 18 <==
-
-=== 18 ===
-	extern_call exit
 ==> end <==
 
 
