@@ -1,20 +1,10 @@
 Ast:
-10	INPUT ""Enter N: ""; N
-20	IF (N < 0) THEN (PRINT "N must be non-negative": END)
-30	IF (N = 0) THEN (PRINT "F(0) = 0": END)
-40	IF (N = 1) THEN (PRINT "F(1) = 1": END)
-50	LET A = 0
-60	LET B = 1
-70	FOR I = 2 TO N
-80		LET C = (A + B)
-90		LET A = B
-100		LET B = C
-110		NEXT I
-120	PRINT "F("; N; ") = "; C
-130	END
+10	LET X = 1
+20	IF (X = 1) THEN (LET X = 30: LET Y = 40: LET Z = 50)
+30	PRINT "Y = "; Y
 
 data:
-["Enter N: ", "N must be non-negative", "F(0) = 0", "F(1) = 1", "F(", ") = "]
+["Y = "]
 
 start:
 print_val:
@@ -27,46 +17,63 @@ input_ptr:
 	return
 exit:
 	return
+	v0 := 1
+	if v0 != 1 goto l20
+	v0 := 30
+	v1 := 40
+	v2 := 50
+l20:
 	param *0
 	call print_ptr
-	param v0
-	call input_val
-	if v0 >= 0 goto l20
-	param *1
-	call print_ptr
-	call exit
+	param v1
+	call print_val
+
+Original cfg:
+=== 1 ===
+print_ptr:
+	return
+==>  <==
+
+=== 2 ===
+input_val:
+	return
+==>  <==
+
+=== 3 ===
+input_ptr:
+	return
+==>  <==
+
+=== 4 ===
+exit:
+	return
+==>  <==
+
+=== 5 ===
+	v0 := 1
+	if v0 != 1 goto l20
+==> 6 <==
+
+=== 6 ===
+	v0 := 30
+	v1 := 40
+	v2 := 50
+==> 7 <==
+
+=== 7 ===
 l20:
-	if v0 != 0 goto l21
-	param *2
+	param *0
 	call print_ptr
-	call exit
-l21:
-	if v0 != 1 goto l22
-	param *3
-	call print_ptr
-	call exit
-l22:
-	v1 := 0
-	v2 := 1
-	v3 := 2
-l23:
-	if v3 >= v0 goto l24
-	v5 := v1 + v2
-	v4 := v5
-	v1 := v2
-	v2 := v4
-	v3 := v3 + 1
-	goto l23
-l24:
-	param *4
-	call print_ptr
-	param v0
+==>  <==
+
+=== 8 ===
+	param v1
 	call print_val
-	param *5
-	call print_ptr
-	param v4
-	call print_val
-	call exit
+==>  <==
+
+=== 9 ===
+==>  <==
+
 
 Constant folded cfg:
 === 1 ===
@@ -90,103 +97,27 @@ exit:
 ==>  <==
 
 === 5 ===
+	v0 := 1
+==> 6 <==
+
+=== 6 ===
+	v0 := 30
+	v1 := 40
+	v2 := 50
+==> 7 <==
+
+=== 7 ===
+l20:
 	param *0
 	call print_ptr
 ==>  <==
 
-=== 6 ===
-	param v0
-	call input_val
-==>  <==
-
-=== 7 ===
-	if v0 >= 0 goto l20
-==> 8 <==
-
 === 8 ===
-	param *1
-	call print_ptr
+	param v1
+	call print_val
 ==>  <==
 
 === 9 ===
-	call exit
-==>  <==
-
-=== 10 ===
-l20:
-	if v0 != 0 goto l21
-==> 11 <==
-
-=== 11 ===
-	param *2
-	call print_ptr
-==>  <==
-
-=== 12 ===
-	call exit
-==>  <==
-
-=== 13 ===
-l21:
-	if v0 != 1 goto l22
-==> 14 <==
-
-=== 14 ===
-	param *3
-	call print_ptr
-==>  <==
-
-=== 15 ===
-	call exit
-==>  <==
-
-=== 16 ===
-l22:
-	v1 := 0
-	v2 := 1
-	v3 := 2
-==>  <==
-
-=== 17 ===
-l23:
-	if v3 >= v0 goto l24
-==> 18 || 19 <==
-
-=== 18 ===
-	v5 := v1 + v2
-	v4 := v5
-	v1 := v2
-	v2 := v4
-	v3 := v3 + 1
-	goto l23
-==> 17 <==
-
-=== 19 ===
-l24:
-	param *4
-	call print_ptr
-==> 1 <==
-
-=== 20 ===
-	param v0
-	call print_val
-==> 0 <==
-
-=== 21 ===
-	param *5
-	call print_ptr
-==> 1 <==
-
-=== 22 ===
-	param v4
-	call print_val
-==> 0 <==
-
-=== 23 ===
-	call exit
-==> 4 <==
-
-=== 24 ===
 ==>  <==
 
 

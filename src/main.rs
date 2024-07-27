@@ -22,7 +22,7 @@ fn main() {
             println!("start:\n{}", tac);
 
             let mut cfg = cfg::Builder::new(tac).build();
-            // println!("Original cfg:\n{}", cfg);
+            println!("Original cfg:\n{}", cfg);
             cfg.constant_fold();
             println!("Constant folded cfg:\n{}", cfg);
         }

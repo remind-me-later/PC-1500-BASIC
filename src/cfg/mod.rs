@@ -6,13 +6,6 @@ use std::collections::HashMap;
 
 use crate::tac::{Operand, Tac};
 
-#[derive(Debug, Clone, Copy)]
-pub enum FoldResult {
-    Unchanged,
-    Linear,
-    Branch,
-}
-
 #[derive(Debug)]
 pub struct BasicBlock {
     pub id: u32,
@@ -35,11 +28,10 @@ impl BasicBlock {
         self.tacs.push(tac);
     }
 
-    pub fn constant_fold(&mut self) -> FoldResult {
+    pub fn constant_fold(&mut self) {
         let mut var_val: HashMap<Operand, i32> = HashMap::new();
 
         let mut new_tacs = Vec::new();
-        let mut fold_result = FoldResult::Unchanged;
 
         for tac in self.tacs.iter() {
             match tac {
@@ -177,9 +169,9 @@ impl BasicBlock {
 
                         if result != 0 {
                             new_tacs.push(Tac::Goto { label: *label });
-                            fold_result = FoldResult::Branch;
+                            self.next_linear = None;
                         } else {
-                            fold_result = FoldResult::Linear;
+                            self.next_branch = None;
                         }
                     } else {
                         new_tacs.push(Tac::If {
@@ -206,8 +198,6 @@ impl BasicBlock {
         }
 
         self.tacs = new_tacs;
-
-        fold_result
     }
 }
 
@@ -251,68 +241,9 @@ pub struct Cfg {
 
 impl Cfg {
     pub fn constant_fold(&mut self) {
-        // let mut indices = self.graph.node_indices().collect::<Vec<_>>();
-
-        // while let Some(node) = indices.pop() {
-        //     let block = self.graph.node_weight_mut(node).unwrap();
-        //     let block_id = block.id;
-        //     let res = block.constant_fold();
-        //     match res {
-        //         FoldResult::Unchanged => {}
-        //         FoldResult::Linear => {
-        //             let mut next = None;
-        //             let neighbours = self.graph.neighbors(node).collect::<Vec<_>>();
-
-        //             for neighbour in neighbours {
-        //                 let neighbour_block = self.graph.node_weight(neighbour).unwrap();
-        //                 if neighbour_block.id == block_id + 1 {
-        //                     next = Some(neighbour);
-        //                 }
-        //                 let edge = self.graph.find_edge(node, neighbour).unwrap();
-        //                 self.graph.remove_edge(edge);
-        //             }
-
-        //             if let Some(next) = next {
-        //                 let next_neighbours = self.graph.neighbors(next).collect::<Vec<_>>();
-        //                 let mut next_block = self.graph.remove_node(next).unwrap();
-        //                 indices.retain(|&idx| idx != next);
-
-        //                 let block = self.graph.node_weight_mut(node).unwrap();
-
-        //                 block.tacs.append(&mut next_block.tacs);
-        //                 for neighbour in next_neighbours {
-        //                     self.graph.add_edge(node, neighbour, ());
-        //                 }
-        //             } else {
-        //                 unreachable!();
-        //             }
-        //         }
-        //         FoldResult::Branch => {
-        //             let mut next = None;
-        //             let neighbours = self.graph.neighbors(node).collect::<Vec<_>>();
-
-        //             for neighbour in neighbours {
-        //                 let neighbour_block = self.graph.node_weight(neighbour).unwrap();
-        //                 if neighbour_block.id != block_id + 1 {
-        //                     next = Some(neighbour);
-        //                 }
-        //                 let edge = self.graph.find_edge(node, neighbour).unwrap();
-        //                 self.graph.remove_edge(edge);
-        //             }
-
-        //             if let Some(next) = next {
-        //                 self.graph.add_edge(node, next, ());
-        //             } else {
-        //                 unreachable!();
-        //             }
-        //         }
-        //     }
-        // }
-
-        // // remove empty blocks
-        // self.graph
-        //     .retain_nodes(|block, idx| !block.node_weight(idx).unwrap().tacs.is_empty());
-        // todo!()
+        for node in self.arena.iter_mut() {
+            node.constant_fold();
+        }
     }
 }
 
