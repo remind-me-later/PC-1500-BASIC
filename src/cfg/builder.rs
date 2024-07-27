@@ -49,9 +49,7 @@ impl Builder {
     fn new_block(&mut self) {
         {
             let upgraded = self.current_block.upgrade().unwrap();
-            let current_block =
-                <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(&upgraded)
-                    .borrow();
+            let current_block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
 
             if current_block.tacs.is_empty() {
                 return;

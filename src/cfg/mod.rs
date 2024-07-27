@@ -232,15 +232,13 @@ impl std::fmt::Display for BasicBlock {
 
         if let Some(next_to) = &self.next_to {
             let upgraded = next_to.upgrade().unwrap();
-            let block = <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(&upgraded)
-                .borrow();
+            let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
             write!(f, "next: {}", block.id)?;
         }
 
         if let Some(branch_to) = &self.branch_to {
             let upgraded = branch_to.upgrade().unwrap();
-            let block = <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(&upgraded)
-                .borrow();
+            let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
             write!(f, " branch: {}", block.id)?;
         }
 
@@ -268,8 +266,7 @@ impl Cfg {
 impl std::fmt::Display for Cfg {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for node in self.arena.iter() {
-            let node =
-                <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(node).borrow();
+            let node = <Rc<_> as Borrow<RefCell<_>>>::borrow(node).borrow();
             writeln!(f, "{}\n", node)?;
         }
 
