@@ -2,9 +2,7 @@ mod ast;
 mod cfg;
 mod tac;
 
-
 use ast::SemanticChecker;
-use ast::SymbolTableBuilderVisitor;
 use tac::Builder;
 
 // TODO: use clap for argument parsing
@@ -19,9 +17,7 @@ fn main() {
             let printer = ast::Printer::new();
             let output = printer.build(&program);
             println!("Ast:\n{}", output);
-            let symbol_table = SymbolTableBuilderVisitor::new(&program).build();
-            // println!("Symbols:\n{}", symbol_table);
-            let type_checker = SemanticChecker::new(&symbol_table, &program);
+            let type_checker = SemanticChecker::new(&program);
             type_checker.check().unwrap();
             let (hir, const_data) = Builder::new(&program).build();
 

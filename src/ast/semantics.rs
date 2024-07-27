@@ -1,23 +1,37 @@
 use super::{
-    symbol_table::{SymbolTable, Ty},
     BinaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor, Statement,
     StatementVisitor,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ty {
+    Int,
+    String,
+}
+
+impl std::fmt::Display for Ty {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Ty::Int => write!(f, "INT"),
+            Ty::String => write!(f, "STR"),
+        }
+    }
+}
+
 pub struct SemanticChecker<'a> {
     program: &'a Program<'a>,
     errors: Vec<String>,
-    symbol_table: &'a SymbolTable<'a>,
+    // symbol_table: &'a SymbolTable<'a>,
     for_stack: Vec<&'a str>,
 }
 
 impl<'a> SemanticChecker<'a> {
-    pub fn new(symbol_table: &'a SymbolTable<'a>, program: &'a Program<'a>) -> Self {
+    pub fn new(program: &'a Program<'a>) -> Self {
         SemanticChecker {
             errors: Vec::new(),
             for_stack: Vec::new(),
             program,
-            symbol_table,
+            // symbol_table,
         }
     }
 
@@ -29,11 +43,19 @@ impl<'a> SemanticChecker<'a> {
             Err(self.errors)
         }
     }
+
+    fn get_ty(&self, name: &'a str) -> Ty {
+        if name.ends_with("$") {
+            Ty::String
+        } else {
+            Ty::Int
+        }
+    }
 }
 
 impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
     fn visit_variable(&mut self, name: &'a str) -> Ty {
-        self.symbol_table.lookup(name).unwrap().ty()
+        self.get_ty(name)
     }
 
     fn visit_number_literal(&mut self, _: i32) -> Ty {
@@ -90,7 +112,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
 impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     fn visit_let(&mut self, variable: &'a str, expression: &Expression<'a>) {
         let expr_ty = expression.accept(self);
-        let expected_ty = self.symbol_table.lookup(variable).unwrap().ty();
+        let expected_ty = self.get_ty(variable);
         if expr_ty != expected_ty {
             self.errors.push(format!(
                 "Type mismatch: variable {} is {}, expression is {}",
@@ -124,7 +146,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         to: &Expression<'a>,
         step: Option<&Expression<'a>>,
     ) {
-        let var_ty = self.symbol_table.lookup(variable).unwrap().ty();
+        let var_ty = self.get_ty(variable);
 
         if var_ty != Ty::Int {
             self.errors
@@ -149,7 +171,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     }
 
     fn visit_next(&mut self, variable: &'a str) {
-        let var_ty = self.symbol_table.lookup(variable).unwrap().ty();
+        let var_ty = self.get_ty(variable);
         if var_ty != Ty::Int {
             self.errors
                 .push("Loop variable must be an integer".to_string());
