@@ -11,7 +11,7 @@ use std::{
 
 use crate::tac::{Operand, Tac};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BasicBlock {
     pub id: u32,
     pub tacs: Vec<Tac>,
@@ -269,9 +269,28 @@ impl Cfg {
 
 impl std::fmt::Display for Cfg {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for node in self.arena.iter() {
-            let node = <Rc<_> as Borrow<RefCell<_>>>::borrow(node).borrow();
+        let mut stack = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+
+        stack.push(Weak::clone(&self.head));
+
+        while let Some(node) = stack.pop() {
+            let node = node.upgrade().unwrap();
+            let node = <Rc<_> as Borrow<RefCell<_>>>::borrow(&node).borrow();
+
+            if !visited.insert(node.id) {
+                continue;
+            }
+
             writeln!(f, "{}\n", node)?;
+
+            if let Some(next_to) = &node.next_to {
+                stack.push(Weak::clone(next_to));
+            }
+
+            if let Some(branch_to) = &node.branch_to {
+                stack.push(Weak::clone(branch_to));
+            }
         }
 
         Ok(())

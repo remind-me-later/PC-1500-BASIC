@@ -112,7 +112,7 @@ impl std::fmt::Display for Operand {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tac {
     // Expressions
     BinExpression {
