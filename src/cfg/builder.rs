@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem};
+use std::{collections::HashMap, mem, vec};
 
 use crate::tac::{Operand, Program, ProgramVisitor, Tac, TacVisitor};
 
@@ -16,7 +16,8 @@ pub struct Builder {
 
 impl Builder {
     pub fn new(program: Program) -> Self {
-        let head = Box::into_raw(Box::new(BasicBlock::new(0)));
+        let mut arena = vec![BasicBlock::new(0)];
+        let head = &mut arena[0] as *mut BasicBlock;
         let current_block = head;
 
         Builder {
@@ -26,7 +27,7 @@ impl Builder {
             head,
             label_to_block: HashMap::new(),
             branch_stack: Vec::new(),
-            arena: Vec::new(),
+            arena,
         }
     }
 
@@ -40,10 +41,10 @@ impl Builder {
         }
     }
 
-    fn new_block(&mut self) -> *mut BasicBlock {
+    fn new_block(&mut self) {
         let current_block = unsafe { &mut *self.current_block };
         if current_block.tacs.is_empty() {
-            return self.current_block;
+            return;
         }
 
         let block = BasicBlock::new(self.next_id);
@@ -51,7 +52,6 @@ impl Builder {
         self.arena.push(block);
         self.current_block = &mut self.arena[idx] as *mut BasicBlock;
         self.next_id += 1;
-        self.current_block
     }
 
     fn current_block_mut(&mut self) -> &mut BasicBlock {
@@ -120,7 +120,11 @@ impl TacVisitor for Builder {
         let last_block = unsafe { &mut *last_block_idx };
 
         match last_block.tacs.last().unwrap() {
-            Tac::Goto { .. } | Tac::If { .. } | Tac::Call { .. } | Tac::Return => {}
+            Tac::Goto { .. }
+            | Tac::If { .. }
+            | Tac::Call { .. }
+            | Tac::Return
+            | Tac::ExternCall { .. } => {}
             _ => {
                 last_block.next_linear = Some(current_block_idx);
             }
@@ -148,9 +152,10 @@ impl TacVisitor for Builder {
             label,
         });
 
-        self.branch_stack.push((self.current_block, label));
+        self.branch_stack.push((current_block_ptr, label));
 
-        let new_block_ptr = self.new_block();
+        self.new_block();
+        let new_block_ptr = self.current_block;
 
         let current_block = unsafe { &mut *current_block_ptr };
         current_block.next_linear = Some(new_block_ptr);
@@ -167,5 +172,17 @@ impl TacVisitor for Builder {
     fn visit_param(&mut self, operand: &Operand) {
         self.current_block_mut()
             .push(Tac::Param { operand: *operand });
+    }
+
+    fn visit_extern_call(&mut self, label: u32) {
+        self.current_block_mut().push(Tac::ExternCall { label });
+
+        let current_block_ptr = self.current_block;
+
+        self.new_block();
+        let next_block = self.current_block;
+
+        let current_block = unsafe { &mut *current_block_ptr };
+        current_block.next_linear = Some(next_block);
     }
 }

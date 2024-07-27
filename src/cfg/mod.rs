@@ -194,6 +194,10 @@ impl BasicBlock {
                 Tac::Call { label } => {
                     new_tacs.push(Tac::Call { label: *label });
                 }
+
+                Tac::ExternCall { label } => {
+                    new_tacs.push(Tac::ExternCall { label: *label });
+                }
             }
         }
 
@@ -222,10 +226,12 @@ impl std::fmt::Display for BasicBlock {
             write!(f, "{} || {}", next_linear_id, next_branch_id)?;
         } else if let Some(next_linear) = self.next_linear {
             let next_linear_id = unsafe { &*next_linear }.id;
-            write!(f, "{}", next_linear_id)?;
+            write!(f, "go {}", next_linear_id)?;
         } else if let Some(next_branch) = self.next_branch {
             let next_branch_id = unsafe { &*next_branch }.id;
-            write!(f, "{}", next_branch_id)?;
+            write!(f, "br {}", next_branch_id)?;
+        } else {
+            write!(f, "end")?;
         }
         write!(f, " <==")?;
 

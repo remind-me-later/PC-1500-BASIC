@@ -7,16 +7,6 @@ data:
 ["Y = "]
 
 start:
-print_val:
-	return
-print_ptr:
-	return
-input_val:
-	return
-input_ptr:
-	return
-exit:
-	return
 	v0 := 1
 	if v0 != 1 goto l20
 	v0 := 30
@@ -24,100 +14,34 @@ exit:
 	v2 := 50
 l20:
 	param *0
-	call print_ptr
+	extern_call print_ptr
 	param v1
-	call print_val
+	extern_call print_val
 
 Original cfg:
-=== 1 ===
-print_ptr:
-	return
-==>  <==
-
-=== 2 ===
-input_val:
-	return
-==>  <==
-
-=== 3 ===
-input_ptr:
-	return
-==>  <==
-
-=== 4 ===
-exit:
-	return
-==>  <==
-
-=== 5 ===
+=== 0 ===
 	v0 := 1
 	if v0 != 1 goto l20
-==> 6 <==
+==> end <==
 
-=== 6 ===
+=== 1 ===
 	v0 := 30
 	v1 := 40
 	v2 := 50
-==> 7 <==
-
-=== 7 ===
-l20:
-	param *0
-	call print_ptr
-==>  <==
-
-=== 8 ===
-	param v1
-	call print_val
-==>  <==
-
-=== 9 ===
-==>  <==
-
-
-Constant folded cfg:
-=== 1 ===
-print_ptr:
-	return
-==>  <==
+==> go 2 <==
 
 === 2 ===
-input_val:
-	return
-==>  <==
-
-=== 3 ===
-input_ptr:
-	return
-==>  <==
-
-=== 4 ===
-exit:
-	return
-==>  <==
-
-=== 5 ===
-	v0 := 1
-==> 6 <==
-
-=== 6 ===
-	v0 := 30
-	v1 := 40
-	v2 := 50
-==> 7 <==
-
-=== 7 ===
 l20:
 	param *0
-	call print_ptr
-==>  <==
+	extern_call print_ptr
+==> go 3 <==
 
-=== 8 ===
+=== 3 ===
 	param v1
-	call print_val
-==>  <==
+	extern_call print_val
+==> end <==
 
-=== 9 ===
-==>  <==
+=== 4 ===
+==> end <==
 
 

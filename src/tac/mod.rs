@@ -138,6 +138,9 @@ pub enum Tac {
         label: u32,
     },
     // Labels 0-100 are reserved for built-in functions
+    ExternCall {
+        label: u32,
+    },
     Call {
         label: u32,
     },
@@ -183,6 +186,10 @@ impl std::fmt::Display for Tac {
                 label,
             } => {
                 write!(f, "if {} {} {} goto ", left, op, right)?;
+                print_label(f, *label)
+            }
+            Tac::ExternCall { label } => {
+                write!(f, "extern_call ")?;
                 print_label(f, *label)
             }
             Tac::Call { label } => {
@@ -248,6 +255,7 @@ pub trait TacVisitor {
     fn visit_return(&mut self);
     fn visit_if(&mut self, op: BinaryOperator, left: &Operand, right: &Operand, label: u32);
     fn visit_call(&mut self, label: u32);
+    fn visit_extern_call(&mut self, label: u32);
     fn visit_param(&mut self, operand: &Operand);
 }
 
@@ -271,6 +279,7 @@ impl Tac {
                 label,
             } => visitor.visit_if(*op, left, right, *label),
             Tac::Call { label } => visitor.visit_call(*label),
+            Tac::ExternCall { label } => visitor.visit_extern_call(*label),
             Tac::Param { operand } => visitor.visit_param(operand),
         }
     }

@@ -181,12 +181,12 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
 
             match operand {
                 Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
-                    self.hir.push(Tac::Call {
+                    self.hir.push(Tac::ExternCall {
                         label: PRINT_VAL_LABEL,
                     });
                 }
                 Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
-                    self.hir.push(Tac::Call {
+                    self.hir.push(Tac::ExternCall {
                         label: PRINT_PTR_LABEL,
                     });
                 }
@@ -201,12 +201,12 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
 
             match prompt {
                 Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
-                    self.hir.push(Tac::Call {
+                    self.hir.push(Tac::ExternCall {
                         label: PRINT_VAL_LABEL,
                     });
                 }
                 Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
-                    self.hir.push(Tac::Call {
+                    self.hir.push(Tac::ExternCall {
                         label: PRINT_PTR_LABEL,
                     });
                 }
@@ -218,12 +218,12 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
 
         match dest {
             Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
-                self.hir.push(Tac::Call {
+                self.hir.push(Tac::ExternCall {
                     label: INPUT_VAL_LABEL,
                 });
             }
             Operand::IndirectNumberLiteral { .. } | Operand::IndirectVariable { .. } => {
-                self.hir.push(Tac::Call {
+                self.hir.push(Tac::ExternCall {
                     label: INPUT_PTR_LABEL,
                 });
             }
@@ -301,7 +301,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
     }
 
     fn visit_end(&mut self) {
-        self.hir.push(Tac::Call { label: EXIT_LABEL });
+        self.hir.push(Tac::ExternCall { label: EXIT_LABEL });
     }
 
     fn visit_gosub(&mut self, line_number: u32) {
@@ -389,33 +389,6 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
 
 impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
     fn visit_program(&mut self, program: &'a ast::Program<'a>) {
-        // FIXME: very ugly hack, should implement extern definitions probably
-        // but for testing should be fine
-        self.hir.push(Tac::Label {
-            id: PRINT_VAL_LABEL,
-        });
-        self.hir.push(Tac::Return);
-
-        self.hir.push(Tac::Label {
-            id: PRINT_PTR_LABEL,
-        });
-        self.hir.push(Tac::Return);
-
-        self.hir.push(Tac::Label {
-            id: INPUT_VAL_LABEL,
-        });
-        self.hir.push(Tac::Return);
-
-        self.hir.push(Tac::Label {
-            id: INPUT_PTR_LABEL,
-        });
-        self.hir.push(Tac::Return);
-
-        self.hir.push(Tac::Label { id: EXIT_LABEL });
-        self.hir.push(Tac::Return);
-
-        // Real code
-
         for (&line_number, stmt) in program.iter() {
             self.line_to_hir_map
                 .insert(line_number as usize, self.hir.len());
@@ -431,6 +404,11 @@ impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
             let new_label = {
                 let line = match &self.hir[goto_idx] {
                     Tac::Goto { label: line } | Tac::Call { label: line } => *line as usize,
+                    Tac::ExternCall { label: _ } => {
+                        // IGNORE EXTERN CALLS
+                        i += 1;
+                        continue;
+                    }
                     _ => unreachable!("Invalid goto position: {}", self.hir[goto_idx]),
                 };
 

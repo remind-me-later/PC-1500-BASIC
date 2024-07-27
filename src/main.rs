@@ -23,8 +23,8 @@ fn main() {
 
             let mut cfg = cfg::Builder::new(tac).build();
             println!("Original cfg:\n{}", cfg);
-            cfg.constant_fold();
-            println!("Constant folded cfg:\n{}", cfg);
+            // cfg.constant_fold();
+            // println!("Constant folded cfg:\n{}", cfg);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }
