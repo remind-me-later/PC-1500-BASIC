@@ -1,10 +1,20 @@
 Ast:
-10 LET X = 1
-20 IF (X = 1) THEN (LET X = 30: LET Y = 40: LET Z = 50)
-30 PRINT "Y = "; Y
+10	INPUT ""Enter N: ""; N
+20	IF (N < 0) THEN (PRINT "N must be non-negative": END)
+30	IF (N = 0) THEN (PRINT "F(0) = 0": END)
+40	IF (N = 1) THEN (PRINT "F(1) = 1": END)
+50	LET A = 0
+60	LET B = 1
+70	FOR I = 2 TO N
+80		LET C = (A + B)
+90		LET A = B
+100		LET B = C
+110		NEXT I
+120	PRINT "F("; N; ") = "; C
+130	END
 
 data:
-["Y = "]
+["Enter N: ", "N must be non-negative", "F(0) = 0", "F(1) = 1", "F(", ") = "]
 
 start:
 print_val:
@@ -17,16 +27,46 @@ input_ptr:
 	return
 exit:
 	return
-	v0 := 1
-	if v0 != 1 goto l20
-	v0 := 30
-	v1 := 40
-	v2 := 50
-l20:
 	param *0
 	call print_ptr
-	param v1
+	param v0
+	call input_val
+	if v0 >= 0 goto l20
+	param *1
+	call print_ptr
+	call exit
+l20:
+	if v0 != 0 goto l21
+	param *2
+	call print_ptr
+	call exit
+l21:
+	if v0 != 1 goto l22
+	param *3
+	call print_ptr
+	call exit
+l22:
+	v1 := 0
+	v2 := 1
+	v3 := 2
+l23:
+	if v3 >= v0 goto l24
+	v5 := v1 + v2
+	v4 := v5
+	v1 := v2
+	v2 := v4
+	v3 := v3 + 1
+	goto l23
+l24:
+	param *4
+	call print_ptr
+	param v0
 	call print_val
+	param *5
+	call print_ptr
+	param v4
+	call print_val
+	call exit
 
 Constant folded cfg:
 === BB:0 ===
@@ -55,21 +95,100 @@ exit:
 ==> <==
 
 === BB:5 ===
-	v0 := 1
-	v0 := 30
-	v1 := 40
-	v2 := 50
-==> BB:7 <==
-
-=== BB:8 ===
-	param v1
-	call print_val
-==> BB:0 <==
-
-=== BB:7 ===
-l20:
 	param *0
 	call print_ptr
 ==> BB:1 <==
+
+=== BB:6 ===
+	param v0
+	call input_val
+==> BB:2 <==
+
+=== BB:7 ===
+	if v0 >= 0 goto l20
+==> BB:10 BB:8 <==
+
+=== BB:8 ===
+	param *1
+	call print_ptr
+==> BB:1 <==
+
+=== BB:9 ===
+	call exit
+==> BB:4 <==
+
+=== BB:10 ===
+l20:
+	if v0 != 0 goto l21
+==> BB:13 BB:11 <==
+
+=== BB:11 ===
+	param *2
+	call print_ptr
+==> BB:1 <==
+
+=== BB:12 ===
+	call exit
+==> BB:4 <==
+
+=== BB:13 ===
+l21:
+	if v0 != 1 goto l22
+==> BB:16 BB:14 <==
+
+=== BB:14 ===
+	param *3
+	call print_ptr
+==> BB:1 <==
+
+=== BB:15 ===
+	call exit
+==> BB:4 <==
+
+=== BB:16 ===
+l22:
+	v1 := 0
+	v2 := 1
+	v3 := 2
+==> BB:17 <==
+
+=== BB:17 ===
+l23:
+	if v3 >= v0 goto l24
+==> BB:19 BB:18 <==
+
+=== BB:18 ===
+	v5 := v1 + v2
+	v4 := v5
+	v1 := v2
+	v2 := v4
+	v3 := v3 + 1
+	goto l23
+==> BB:17 <==
+
+=== BB:19 ===
+l24:
+	param *4
+	call print_ptr
+==> BB:1 <==
+
+=== BB:20 ===
+	param v0
+	call print_val
+==> BB:0 <==
+
+=== BB:21 ===
+	param *5
+	call print_ptr
+==> BB:1 <==
+
+=== BB:22 ===
+	param v4
+	call print_val
+==> BB:0 <==
+
+=== BB:23 ===
+	call exit
+==> BB:4 <==
 
 

@@ -24,9 +24,9 @@ impl<'a> Printer<'a> {
     }
 
     fn indent(&mut self) {
-        self.output.push(' ');
+        self.output.push('\t');
         for _ in 0..self.indent {
-            self.output.push(' ');
+            self.output.push('\t');
         }
     }
 }
@@ -113,11 +113,11 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
             self.output.push_str(" STEP ");
             step.accept(self);
         }
-        self.indent += 4;
+        self.indent += 1;
     }
 
     fn visit_next(&mut self, variable: &'a str) {
-        self.indent -= 4;
+        self.indent -= 1;
 
         self.output.push_str("NEXT ");
         self.output.push_str(variable);
