@@ -124,8 +124,8 @@ pub enum Statement<'a> {
     Return,
     If {
         condition: &'a Expression<'a>,
-        then: &'a mut Statement<'a>,
-        else_: Option<&'a mut Statement<'a>>,
+        then: &'a Statement<'a>,
+        else_: Option<&'a Statement<'a>>,
     },
     Seq {
         statements: Vec<Statement<'a>>,

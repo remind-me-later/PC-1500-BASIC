@@ -8,33 +8,35 @@ use nom::{
     sequence::{delimited, preceded, tuple},
     IResult,
 };
-use std::{cell::RefCell, collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 pub struct AstBuilder<'parser> {
-    bump: &'parser bumpalo::Bump,
-
-    str_map: RefCell<HashMap<&'parser str, &'parser str>>,
+    bump: bumpalo::Bump,
+    phantom: std::marker::PhantomData<&'parser ()>,
 }
 
 impl<'parser> AstBuilder<'parser> {
-    pub fn new(bump: &'parser bumpalo::Bump) -> Self {
+    pub fn new() -> Self {
         Self {
-            bump,
-            str_map: RefCell::new(HashMap::new()),
+            bump: bumpalo::Bump::new(),
+            phantom: std::marker::PhantomData,
         }
     }
 
-    fn get_str(&self, s: &str) -> &'parser str {
-        if self.str_map.borrow().contains_key(s) {
-            self.str_map.borrow().get(s).unwrap()
-        } else {
-            let s = self.bump.alloc(s.to_string());
-            self.str_map.borrow_mut().insert(s, s);
-            s
-        }
+    pub fn parse<'input>(
+        &'parser self,
+        input: &'input str,
+    ) -> IResult<&'input str, Program<'parser>> {
+        let (input, program) = self.parse_program(input)?;
+
+        Ok((input, program))
     }
 
-    fn get_expr(&self, expr: Expression<'parser>) -> &'parser Expression<'parser> {
+    fn get_str(&'parser self, s: &str) -> &str {
+        self.bump.alloc(s.to_string())
+    }
+
+    fn get_expr(&self, expr: Expression<'parser>) -> &Expression<'parser> {
         self.bump.alloc(expr)
     }
 
@@ -346,13 +348,13 @@ impl<'parser> AstBuilder<'parser> {
         let (input, _) = space1(input)?;
 
         let (input, then) = self.parse_statement(input)?;
-        let then = self.bump.alloc(then);
+        let then = &*self.bump.alloc(then);
 
         let (input, else_) = opt(preceded(space1, move |i| {
             let (i, _) = tag("ELSE")(i)?;
             let (i, _) = space1(i)?;
             let (i, else_) = self.parse_statement(i)?;
-            let else_ = self.bump.alloc(else_);
+            let else_ = &*self.bump.alloc(else_);
             Ok((i, else_))
         }))(input)?;
 
@@ -509,15 +511,6 @@ impl<'parser> AstBuilder<'parser> {
             program.add_line(line.0, line.1);
             input = new_input;
         }
-
-        Ok((input, program))
-    }
-
-    pub fn parse<'input>(
-        &'parser self,
-        input: &'input str,
-    ) -> IResult<&'input str, Program<'parser>> {
-        let (input, program) = self.parse_program(input)?;
 
         Ok((input, program))
     }

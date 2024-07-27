@@ -13,9 +13,7 @@ fn main() {
     // Read file from first argument
     let input = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
-    let bump = bumpalo::Bump::new();
-
-    let parser = AstBuilder::new(&bump);
+    let parser = AstBuilder::new();
 
     match parser.parse(&input) {
         Ok((_, program)) => {
@@ -27,7 +25,6 @@ fn main() {
             let type_checker = SemanticCheckVisitor::new(&symbol_table, &program);
             type_checker.check().unwrap();
             let (hir, const_data) = HirBuilder::new(&program).build();
-            drop(bump);
 
             println!("data:\n{:?}\n", const_data);
             println!("start:\n{}", hir);
