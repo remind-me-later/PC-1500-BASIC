@@ -33,9 +33,9 @@ fn main() {
             println!("start:\n{}", hir);
 
             let mut cfg = cfg::CFGBuilder::new(hir).build();
-            println!("Original cfg:\n{}", cfg);
-            // cfg.constant_fold();
-            // println!("Constant folded cfg:\n{}", cfg);
+            // println!("Original cfg:\n{}", cfg);
+            cfg.constant_fold();
+            println!("Constant folded cfg:\n{}", cfg);
         }
         Err(err) => eprintln!("Error parsing program: {:?}", err),
     }

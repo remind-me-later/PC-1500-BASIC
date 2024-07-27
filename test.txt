@@ -28,7 +28,7 @@ l20:
 	param v1
 	call print_val
 
-Original cfg:
+Constant folded cfg:
 === BB:0 ===
 print_val:
 	return
@@ -56,27 +56,20 @@ exit:
 
 === BB:5 ===
 	v0 := 1
-	if v0 != 1 goto l20
-==> BB:7 BB:6 <==
-
-=== BB:6 ===
 	v0 := 30
 	v1 := 40
 	v2 := 50
 ==> BB:7 <==
-
-=== BB:7 ===
-l20:
-	param *0
-	call print_ptr
-==> BB:1 <==
 
 === BB:8 ===
 	param v1
 	call print_val
 ==> BB:0 <==
 
-=== BB:9 ===
-==> <==
+=== BB:7 ===
+l20:
+	param *0
+	call print_ptr
+==> BB:1 <==
 
 
