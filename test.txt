@@ -2,12 +2,15 @@ Ast:
 10	LET X = 1
 20	IF (X = 1) THEN (LET X = 30: LET Y = 40: LET Z = 50)
 30	PRINT "Y = "; Y
+40	LET X = (X + 2)
+50	GOTO 20
 
 data:
 ["Y = "]
 
 start:
 	v0 := 1
+l21:
 	if v0 != 1 goto l20
 	v0 := 30
 	v1 := 40
@@ -17,31 +20,44 @@ l20:
 	extern_call print_ptr
 	param v1
 	extern_call print_val
+	v3 := v0 + 2
+	v0 := v3
+	goto l21
 
 Original cfg:
 === 0 ===
 	v0 := 1
-	if v0 != 1 goto l20
-==> end <==
+==> next: 1 <==
 
 === 1 ===
+l21:
+	if v0 != 1 goto l20
+==> next: 2 branch: 3 <==
+
+=== 2 ===
 	v0 := 30
 	v1 := 40
 	v2 := 50
-==> go 2 <==
+==> next: 3 <==
 
-=== 2 ===
+=== 3 ===
 l20:
 	param *0
 	extern_call print_ptr
-==> go 3 <==
-
-=== 3 ===
-	param v1
-	extern_call print_val
-==> end <==
+==> next: 4 <==
 
 === 4 ===
-==> end <==
+	param v1
+	extern_call print_val
+==> next: 5 <==
+
+=== 5 ===
+	v3 := v0 + 2
+	v0 := v3
+	goto l21
+==>  branch: 1 <==
+
+=== 6 ===
+==>  <==
 
 

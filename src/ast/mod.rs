@@ -49,12 +49,12 @@ impl std::fmt::Display for BinaryOperator {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Expression<'a> {
     NumberLiteral(i32),
     StringLiteral(&'a str),
     Variable(&'a str),
-    BinaryOp {
+    Binary {
         left: &'a Expression<'a>,
         op: BinaryOperator,
         right: &'a Expression<'a>,
@@ -67,25 +67,7 @@ impl std::fmt::Display for Expression<'_> {
             Expression::StringLiteral(content) => write!(f, "\"{}\"", content),
             Expression::NumberLiteral(value) => write!(f, "{}", value),
             Expression::Variable(variable) => write!(f, "{}", variable),
-            Expression::BinaryOp { left, op, right } => write!(f, "{} {} {}", left, op, right),
-        }
-    }
-}
-
-impl std::fmt::Debug for Expression<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // print also direction
-        match self {
-            Expression::StringLiteral(content) => {
-                write!(f, "StringLiteral(\"{}\")({:p})", content, self)
-            }
-            Expression::NumberLiteral(value) => {
-                write!(f, "NumberLiteral({})({:p})", value, self)
-            }
-            Expression::Variable(variable) => write!(f, "Variable({})({:p})", variable, self),
-            Expression::BinaryOp { left, op, right } => {
-                write!(f, "BinaryOp({:?}, {:?}, {:?})({:p})", left, op, right, self)
-            }
+            Expression::Binary { left, op, right } => write!(f, "{} {} {}", left, op, right),
         }
     }
 }
@@ -177,7 +159,7 @@ impl<'a> Expression<'a> {
             Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
             Expression::StringLiteral(content) => visitor.visit_string_literal(content),
             Expression::Variable(variable) => visitor.visit_variable(variable),
-            Expression::BinaryOp { left, op, right } => visitor.visit_binary_op(left, *op, right),
+            Expression::Binary { left, op, right } => visitor.visit_binary_op(left, *op, right),
         }
     }
 }

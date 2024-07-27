@@ -352,7 +352,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
                     label,
                 }
             }
-            ast::Expression::BinaryOp { left, op, right } => {
+            ast::Expression::Binary { left, op, right } => {
                 let left = left.accept(self);
                 let right = right.accept(self);
 

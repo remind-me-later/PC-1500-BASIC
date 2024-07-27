@@ -2,7 +2,12 @@ mod builder;
 
 pub use builder::Builder;
 
-use std::collections::HashMap;
+use std::{
+    borrow::Borrow,
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 use crate::tac::{Operand, Tac};
 
@@ -10,8 +15,8 @@ use crate::tac::{Operand, Tac};
 pub struct BasicBlock {
     pub id: u32,
     pub tacs: Vec<Tac>,
-    pub next_linear: Option<*mut BasicBlock>,
-    pub next_branch: Option<*mut BasicBlock>,
+    pub next_to: Option<Weak<RefCell<BasicBlock>>>,
+    pub branch_to: Option<Weak<RefCell<BasicBlock>>>,
 }
 
 impl BasicBlock {
@@ -19,13 +24,17 @@ impl BasicBlock {
         BasicBlock {
             id,
             tacs: Vec::new(),
-            next_linear: None,
-            next_branch: None,
+            next_to: None,
+            branch_to: None,
         }
     }
 
     pub fn push(&mut self, tac: Tac) {
         self.tacs.push(tac);
+    }
+
+    pub fn last(&self) -> Option<&Tac> {
+        self.tacs.last()
     }
 
     pub fn constant_fold(&mut self) {
@@ -169,9 +178,9 @@ impl BasicBlock {
 
                         if result != 0 {
                             new_tacs.push(Tac::Goto { label: *label });
-                            self.next_linear = None;
+                            self.next_to = None;
                         } else {
-                            self.next_branch = None;
+                            self.branch_to = None;
                         }
                     } else {
                         new_tacs.push(Tac::If {
@@ -220,19 +229,21 @@ impl std::fmt::Display for BasicBlock {
         }
 
         write!(f, "==> ")?;
-        if let (Some(next_linear), Some(next_branch)) = (self.next_linear, self.next_branch) {
-            let next_linear_id = unsafe { &*next_linear }.id;
-            let next_branch_id = unsafe { &*next_branch }.id;
-            write!(f, "{} || {}", next_linear_id, next_branch_id)?;
-        } else if let Some(next_linear) = self.next_linear {
-            let next_linear_id = unsafe { &*next_linear }.id;
-            write!(f, "go {}", next_linear_id)?;
-        } else if let Some(next_branch) = self.next_branch {
-            let next_branch_id = unsafe { &*next_branch }.id;
-            write!(f, "br {}", next_branch_id)?;
-        } else {
-            write!(f, "end")?;
+
+        if let Some(next_to) = &self.next_to {
+            let upgraded = next_to.upgrade().unwrap();
+            let block = <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(&upgraded)
+                .borrow();
+            write!(f, "next: {}", block.id)?;
         }
+
+        if let Some(branch_to) = &self.branch_to {
+            let upgraded = branch_to.upgrade().unwrap();
+            let block = <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(&upgraded)
+                .borrow();
+            write!(f, " branch: {}", block.id)?;
+        }
+
         write!(f, " <==")?;
 
         Ok(())
@@ -241,13 +252,14 @@ impl std::fmt::Display for BasicBlock {
 
 #[derive(Debug)]
 pub struct Cfg {
-    arena: Vec<BasicBlock>,
-    head: *mut BasicBlock,
+    arena: Vec<Rc<RefCell<BasicBlock>>>,
+    head: Weak<RefCell<BasicBlock>>,
 }
 
 impl Cfg {
     pub fn constant_fold(&mut self) {
         for node in self.arena.iter_mut() {
+            let mut node = node.borrow_mut();
             node.constant_fold();
         }
     }
@@ -256,6 +268,8 @@ impl Cfg {
 impl std::fmt::Display for Cfg {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for node in self.arena.iter() {
+            let node =
+                <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(node).borrow();
             writeln!(f, "{}\n", node)?;
         }
 

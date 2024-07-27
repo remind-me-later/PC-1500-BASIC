@@ -131,7 +131,7 @@ impl<'parser> Parser<'parser> {
         if let Some((op, right)) = right {
             Ok((
                 input,
-                self.get_expr(Expression::BinaryOp { left, op, right }),
+                self.get_expr(Expression::Binary { left, op, right }),
             ))
         } else {
             Ok((input, left))
@@ -164,7 +164,7 @@ impl<'parser> Parser<'parser> {
         if let Some((op, right)) = right {
             Ok((
                 input,
-                self.get_expr(Expression::BinaryOp { left, op, right }),
+                self.get_expr(Expression::Binary { left, op, right }),
             ))
         } else {
             Ok((input, left))
@@ -201,7 +201,7 @@ impl<'parser> Parser<'parser> {
         let var_name = if let Some((op, right)) = right {
             Ok((
                 input,
-                self.get_expr(Expression::BinaryOp { left, op, right }),
+                self.get_expr(Expression::Binary { left, op, right }),
             ))
         } else {
             Ok((input, left))
@@ -235,7 +235,7 @@ impl<'parser> Parser<'parser> {
         if let Some((op, right)) = right {
             Ok((
                 input,
-                self.get_expr(Expression::BinaryOp { left, op, right }),
+                self.get_expr(Expression::Binary { left, op, right }),
             ))
         } else {
             Ok((input, left))

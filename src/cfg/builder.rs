@@ -1,4 +1,11 @@
-use std::{collections::HashMap, mem, vec};
+use std::{
+    borrow::Borrow,
+    cell::RefCell,
+    collections::HashMap,
+    mem,
+    rc::{Rc, Weak},
+    vec,
+};
 
 use crate::tac::{Operand, Program, ProgramVisitor, Tac, TacVisitor};
 
@@ -6,25 +13,23 @@ use super::{BasicBlock, Cfg};
 
 pub struct Builder {
     program: Program,
-    next_id: u32,
-    current_block: *mut BasicBlock,
-    head: *mut BasicBlock,
-    label_to_block: HashMap<u32, *mut BasicBlock>,
-    branch_stack: Vec<(*mut BasicBlock, u32)>,
-    arena: Vec<BasicBlock>,
+    current_block: Weak<RefCell<BasicBlock>>,
+    head: Weak<RefCell<BasicBlock>>,
+    label_to_block: HashMap<u32, Weak<RefCell<BasicBlock>>>,
+    branch_stack: Vec<(Weak<RefCell<BasicBlock>>, u32)>,
+    arena: Vec<Rc<RefCell<BasicBlock>>>,
 }
 
 impl Builder {
     pub fn new(program: Program) -> Self {
-        let mut arena = vec![BasicBlock::new(0)];
-        let head = &mut arena[0] as *mut BasicBlock;
-        let current_block = head;
+        let strong_head = Rc::new(RefCell::new(BasicBlock::new(0)));
+        let weak_head = Rc::downgrade(&strong_head);
+        let arena = vec![strong_head];
 
         Builder {
             program,
-            next_id: 1,
-            current_block,
-            head,
+            current_block: Weak::clone(&weak_head),
+            head: weak_head,
             label_to_block: HashMap::new(),
             branch_stack: Vec::new(),
             arena,
@@ -42,20 +47,25 @@ impl Builder {
     }
 
     fn new_block(&mut self) {
-        let current_block = unsafe { &mut *self.current_block };
-        if current_block.tacs.is_empty() {
-            return;
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let current_block =
+                <Rc<RefCell<BasicBlock>> as Borrow<RefCell<BasicBlock>>>::borrow(&upgraded)
+                    .borrow();
+
+            if current_block.tacs.is_empty() {
+                return;
+            }
         }
 
-        let block = BasicBlock::new(self.next_id);
-        let idx = self.arena.len();
-        self.arena.push(block);
-        self.current_block = &mut self.arena[idx] as *mut BasicBlock;
-        self.next_id += 1;
-    }
+        let next_id = self.arena.len() as u32;
+        let block = BasicBlock::new(next_id);
+        let strong_block = Rc::new(RefCell::new(block));
+        let weak_block = Rc::downgrade(&strong_block);
 
-    fn current_block_mut(&mut self) -> &mut BasicBlock {
-        unsafe { &mut *self.current_block }
+        self.arena.push(strong_block);
+
+        self.current_block = weak_block;
     }
 }
 
@@ -66,9 +76,17 @@ impl ProgramVisitor for Builder {
         }
 
         for (branch, label) in self.branch_stack.iter() {
-            let block = self.label_to_block.get(label).unwrap();
-            let branch = unsafe { &mut **branch };
-            branch.next_branch = Some(*block);
+            let block = self.label_to_block.get(label).unwrap_or_else(|| {
+                unreachable!(
+                    "Label {} not found, all labels should be correctly set in the TAC",
+                    label
+                )
+            });
+
+            let branch = branch.upgrade().unwrap();
+            let mut branch = branch.borrow_mut();
+
+            branch.branch_to = Some(Weak::clone(block));
         }
     }
 }
@@ -81,7 +99,9 @@ impl TacVisitor for Builder {
         right: &Operand,
         dest: &Operand,
     ) {
-        self.current_block_mut().push(Tac::BinExpression {
+        let upgraded = self.current_block.upgrade().unwrap();
+        let mut block = upgraded.borrow_mut();
+        block.push(Tac::BinExpression {
             left: *left,
             op,
             right: *right,
@@ -90,49 +110,72 @@ impl TacVisitor for Builder {
     }
 
     fn visit_copy(&mut self, src: &Operand, dest: &Operand) {
-        self.current_block_mut().push(Tac::Copy {
+        let upgraded = self.current_block.upgrade().unwrap();
+        let mut block = upgraded.borrow_mut();
+        block.push(Tac::Copy {
             src: *src,
             dest: *dest,
         });
     }
 
     fn visit_goto(&mut self, label: u32) {
-        self.current_block_mut().push(Tac::Goto { label });
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let mut block = upgraded.borrow_mut();
 
-        self.branch_stack.push((self.current_block, label));
+            block.push(Tac::Goto { label });
+        }
+
+        self.branch_stack
+            .push((Weak::clone(&self.current_block), label));
 
         self.new_block();
     }
 
     fn visit_label(&mut self, id: u32) {
-        let last_block_idx = self.current_block;
+        let last_block_weak = Weak::clone(&self.current_block);
         self.new_block();
-        let current_block_idx = self.current_block;
 
-        self.current_block_mut().push(Tac::Label { id });
+        {
+            let link = {
+                let upgraded = self.current_block.upgrade().unwrap();
+                let mut current_block = upgraded.borrow_mut();
 
-        self.label_to_block.insert(id, current_block_idx);
+                current_block.push(Tac::Label { id });
 
-        if last_block_idx == current_block_idx {
-            return;
-        }
+                self.label_to_block
+                    .insert(id, Weak::clone(&self.current_block));
 
-        let last_block = unsafe { &mut *last_block_idx };
+                if last_block_weak.ptr_eq(&Weak::clone(&self.current_block)) {
+                    return;
+                }
 
-        match last_block.tacs.last().unwrap() {
-            Tac::Goto { .. }
-            | Tac::If { .. }
-            | Tac::Call { .. }
-            | Tac::Return
-            | Tac::ExternCall { .. } => {}
-            _ => {
-                last_block.next_linear = Some(current_block_idx);
+                !matches!(
+                    current_block.tacs.last().unwrap(),
+                    Tac::Goto { .. }
+                        | Tac::If { .. }
+                        | Tac::Call { .. }
+                        | Tac::Return
+                        | Tac::ExternCall { .. }
+                )
+            };
+
+            if link {
+                let upgraded = last_block_weak.upgrade().unwrap();
+                let mut last_block = upgraded.borrow_mut();
+
+                last_block.next_to = Some(Weak::clone(&self.current_block));
             }
         }
     }
 
     fn visit_return(&mut self) {
-        self.current_block_mut().push(Tac::Return);
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let mut block = upgraded.borrow_mut();
+
+            block.push(Tac::Return);
+        }
 
         self.new_block();
     }
@@ -144,45 +187,71 @@ impl TacVisitor for Builder {
         right: &Operand,
         label: u32,
     ) {
-        let current_block_ptr = self.current_block;
-        self.current_block_mut().push(Tac::If {
-            op,
-            left: *left,
-            right: *right,
-            label,
-        });
+        let last_block_weak = Weak::clone(&self.current_block);
 
-        self.branch_stack.push((current_block_ptr, label));
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let mut last_block = upgraded.borrow_mut();
+
+            last_block.push(Tac::If {
+                op,
+                left: *left,
+                right: *right,
+                label,
+            });
+
+            self.branch_stack
+                .push((Weak::clone(&self.current_block), label));
+        }
 
         self.new_block();
-        let new_block_ptr = self.current_block;
 
-        let current_block = unsafe { &mut *current_block_ptr };
-        current_block.next_linear = Some(new_block_ptr);
+        {
+            let upgraded = last_block_weak.upgrade().unwrap();
+            let mut last_block = upgraded.borrow_mut();
+
+            last_block.next_to = Some(Weak::clone(&self.current_block));
+        }
     }
 
     fn visit_call(&mut self, label: u32) {
-        self.current_block_mut().push(Tac::Call { label });
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let mut block = upgraded.borrow_mut();
 
-        self.branch_stack.push((self.current_block, label));
+            block.push(Tac::Call { label });
+        }
+
+        self.branch_stack
+            .push((Weak::clone(&self.current_block), label));
 
         self.new_block();
     }
 
     fn visit_param(&mut self, operand: &Operand) {
-        self.current_block_mut()
-            .push(Tac::Param { operand: *operand });
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let mut block = upgraded.borrow_mut();
+            block.push(Tac::Param { operand: *operand });
+        }
     }
 
     fn visit_extern_call(&mut self, label: u32) {
-        self.current_block_mut().push(Tac::ExternCall { label });
+        let last_block_weak = Weak::clone(&self.current_block);
 
-        let current_block_ptr = self.current_block;
+        {
+            let upgraded = self.current_block.upgrade().unwrap();
+            let mut last_block = upgraded.borrow_mut();
+
+            last_block.push(Tac::ExternCall { label });
+        }
 
         self.new_block();
-        let next_block = self.current_block;
 
-        let current_block = unsafe { &mut *current_block_ptr };
-        current_block.next_linear = Some(next_block);
+        {
+            let upgraded = last_block_weak.upgrade().unwrap();
+            let mut last_block = upgraded.borrow_mut();
+            last_block.next_to = Some(Weak::clone(&self.current_block));
+        }
     }
 }
