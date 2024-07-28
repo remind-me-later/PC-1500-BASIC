@@ -5,7 +5,7 @@ mod printer;
 mod semantics;
 mod visitor;
 
-pub use parser::Parser;
+pub use parser::parse;
 pub use printer::Printer;
 pub use semantics::SemanticChecker;
 pub use visitor::{ExpressionVisitor, ProgramVisitor, StatementVisitor};

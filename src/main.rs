@@ -8,9 +8,7 @@ fn main() {
     // Read file from first argument
     let input = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
-    let parser = ast::Parser::new();
-
-    match parser.parse(&input) {
+    match ast::parse(&input) {
         Ok((_, program)) => {
             let printer = ast::Printer::new();
             let output = printer.build(&program);
