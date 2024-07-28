@@ -2,7 +2,7 @@ use super::{BinaryOperator, Expression, Program, Statement};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
-    character::complete::{alpha1, alphanumeric0, digit1, multispace0, space1},
+    character::complete::{alpha1, alphanumeric0, digit1, multispace0, multispace1, space1},
     combinator::{map, map_res, opt, recognize},
     multi::separated_list1,
     sequence::{delimited, preceded, tuple},
@@ -39,9 +39,9 @@ fn parse_variable(input: &str) -> IResult<&str, String> {
 fn parse_factor(input: &str) -> IResult<&str, Expression> {
     let (input, expr) = alt((
         map(parse_number, Expression::NumberLiteral),
-        map(move |i| parse_variable(i), Expression::Variable),
-        map(move |i| parse_string_literal(i), Expression::StringLiteral),
-        move |i| parse_parens_expression(i),
+        map(parse_variable, Expression::Variable),
+        map(parse_string_literal, Expression::StringLiteral),
+        parse_parens_expression,
     ))(input)?;
 
     Ok((input, expr))
@@ -50,10 +50,7 @@ fn parse_factor(input: &str) -> IResult<&str, Expression> {
 fn parse_parens_expression(input: &str) -> IResult<&str, Expression> {
     let (input, expr) = delimited(
         tag("("),
-        preceded(multispace0, move |i| {
-            let (i, expr) = parse_expression(i)?;
-            Ok((i, expr))
-        }),
+        delimited(multispace0, parse_expression, multispace0),
         tag(")"),
     )(input)?;
 
@@ -71,13 +68,14 @@ fn parse_mul_div(input: &str) -> IResult<&str, Expression> {
     let (input, left) = parse_factor(input)?;
 
     // try to parse a multiplication or division operator
-    let (input, right) = opt(preceded(multispace0, move |i| {
+    let (input, right) = opt(move |i| {
+        let (i, _) = multispace0(i)?;
         let (i, op) = parse_mul_div_sign(i)?;
         let (i, _) = multispace0(i)?;
         let (i, right) = parse_mul_div(i)?;
 
         Ok((i, (op, right)))
-    }))(input)?;
+    })(input)?;
 
     // if we didn't find an operator, return the left expression
     if let Some((op, right)) = right {
@@ -100,13 +98,14 @@ fn parse_add_sub(input: &str) -> IResult<&str, Expression> {
     let (input, left) = parse_mul_div(input)?;
 
     // try to parse an addition or subtraction operator
-    let (input, right) = opt(preceded(multispace0, move |i| {
+    let (input, right) = opt(move |i| {
+        let (i, _) = multispace0(i)?;
         let (i, op) = parse_add_sub_sign(i)?;
         let (i, _) = multispace0(i)?;
         let (i, right) = parse_add_sub(i)?;
 
         Ok((i, (op, right)))
-    }))(input)?;
+    })(input)?;
 
     // if we didn't find an operator, return the left expression
     if let Some((op, right)) = right {
@@ -133,13 +132,14 @@ fn parse_comparison(input: &str) -> IResult<&str, Expression> {
     let (input, left) = parse_add_sub(input)?;
 
     // try to parse a comparison operator
-    let (input, right) = opt(preceded(multispace0, move |i| {
+    let (input, right) = opt(move |i| {
+        let (i, _) = multispace0(i)?;
         let (i, op) = parse_comparison_sign(i)?;
         let (i, _) = multispace0(i)?;
         let (i, right) = parse_add_sub(i)?;
 
         Ok((i, (op, right)))
-    }))(input)?;
+    })(input)?;
 
     // if we didn't find an operator, return the left expression
     if let Some((op, right)) = right {
@@ -151,37 +151,68 @@ fn parse_comparison(input: &str) -> IResult<&str, Expression> {
     }
 }
 
-fn parse_and_or(input: &str) -> IResult<&str, Expression> {
-    fn parse_and_or_sign(input: &str) -> IResult<&str, BinaryOperator> {
-        alt((
-            map(tag("AND"), |_| BinaryOperator::And),
-            map(tag("OR"), |_| BinaryOperator::Or),
-        ))(input)
-    }
-
+fn parse_and(input: &str) -> IResult<&str, Expression> {
     let (input, left) = parse_comparison(input)?;
 
-    // try to parse an AND or OR operator
-    let (input, right) = opt(preceded(multispace0, move |i| {
-        let (i, op) = parse_and_or_sign(i)?;
+    // try to parse an AND operator
+    let (input, right) = opt(move |i| {
+        let (i, _) = multispace0(i)?;
+        let (i, _) = tag("AND")(i)?;
         let (i, _) = multispace0(i)?;
         let (i, right) = parse_comparison(i)?;
 
-        Ok((i, (op, right)))
-    }))(input)?;
+        Ok((i, right))
+    })(input)?;
 
     // if we didn't find an operator, return the left expression
-    if let Some((op, right)) = right {
+    if let Some(right) = right {
         let left = Box::new(left);
         let right = Box::new(right);
-        Ok((input, Expression::Binary { left, op, right }))
+        Ok((
+            input,
+            Expression::Binary {
+                left,
+                op: BinaryOperator::And,
+                right,
+            },
+        ))
+    } else {
+        Ok((input, left))
+    }
+}
+
+fn parse_or(input: &str) -> IResult<&str, Expression> {
+    let (input, left) = parse_and(input)?;
+
+    // try to parse an OR operator
+    let (input, right) = opt(move |i| {
+        let (i, _) = multispace0(i)?;
+        let (i, _) = tag("OR")(i)?;
+        let (i, _) = multispace0(i)?;
+        let (i, right) = parse_and(i)?;
+
+        Ok((i, right))
+    })(input)?;
+
+    // if we didn't find an operator, return the left expression
+    if let Some(right) = right {
+        let left = Box::new(left);
+        let right = Box::new(right);
+        Ok((
+            input,
+            Expression::Binary {
+                left,
+                op: BinaryOperator::Or,
+                right,
+            },
+        ))
     } else {
         Ok((input, left))
     }
 }
 
 fn parse_expression(input: &str) -> IResult<&str, Expression> {
-    parse_and_or(input)
+    parse_or(input)
 }
 
 fn parse_let(input: &str) -> IResult<&str, Statement> {
@@ -321,30 +352,28 @@ fn parse_next(input: &str) -> IResult<&str, Statement> {
 }
 
 fn parse_end(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("END")(input)?;
-
-    Ok((input, Statement::End))
+    map(tag("END"), |_| Statement::End)(input)
 }
 
 fn parse_atomic_statement(input: &str) -> IResult<&str, Statement> {
     alt((
-        move |i| parse_let(i),
-        move |i| parse_print(i),
-        move |i| parse_input(i),
-        move |i| parse_goto(i),
-        move |i| parse_for(i),
-        move |i| parse_next(i),
-        move |i| parse_end(i),
-        move |i| parse_gosub(i),
-        move |i| parse_if(i),
-        move |i| parse_return(i),
+        parse_let,
+        parse_print,
+        parse_input,
+        parse_goto,
+        parse_for,
+        parse_next,
+        parse_end,
+        parse_gosub,
+        parse_if,
+        parse_return,
     ))(input)
 }
 
 fn parse_statement(input: &str) -> IResult<&str, Statement> {
     let (input, statements) = separated_list1(
         preceded(multispace0, tag(":")),
-        preceded(multispace0, move |i| parse_atomic_statement(i)),
+        preceded(multispace0, parse_atomic_statement),
     )(input)?;
 
     if statements.len() == 1 {
@@ -364,21 +393,14 @@ fn parse_comment(input: &str) -> IResult<&str, ()> {
 }
 
 fn parse_comment_line(input: &str) -> IResult<&str, ()> {
-    let (input, _) = tuple((
-        move |i| parse_line_number(i),
-        space1,
-        move |i| parse_comment(i),
-    ))(input)?;
+    let (input, _) = tuple((parse_line_number, multispace1, parse_comment))(input)?;
 
     Ok((input, ()))
 }
 
 fn parse_line(input: &str) -> IResult<&str, (u32, Statement)> {
-    let (input, (number, _, statement)) = tuple((
-        move |i| parse_line_number(i),
-        space1,
-        move |i| parse_statement(i),
-    ))(input)?;
+    let (input, (number, _, statement)) =
+        tuple((parse_line_number, multispace1, parse_statement))(input)?;
 
     Ok((input, (number, statement)))
 }
@@ -394,14 +416,14 @@ fn parse_program(input: &str) -> IResult<&str, Program> {
             break;
         }
 
-        let (new_input, _) = opt(move |i| parse_comment_line(i))(new_input)?;
+        let (new_input, _) = opt(parse_comment_line)(new_input)?;
         let (new_input, _) = multispace0(new_input)?;
         if new_input.is_empty() {
             break;
         }
 
-        let (new_input, line) = parse_line(new_input)?;
-        program.add_line(line.0, line.1);
+        let (new_input, (line_number, statement)) = parse_line(new_input)?;
+        program.add_line(line_number, statement);
         input = new_input;
     }
 

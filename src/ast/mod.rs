@@ -126,8 +126,8 @@ impl Program {
         }
     }
 
-    pub fn add_line(&mut self, line_number: u32, ast: Statement) {
-        self.lines.insert(line_number, ast);
+    pub fn add_line(&mut self, line_number: u32, statement: Statement) {
+        self.lines.insert(line_number, statement);
     }
 
     pub fn lookup_line(&self, line_number: u32) -> Option<&Statement> {
