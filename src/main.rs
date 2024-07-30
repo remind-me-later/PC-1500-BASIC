@@ -20,7 +20,7 @@ fn main() {
 
     let mut parser = ast::Parser::new(tokens);
 
-    let program = parser.parse();
+    let (program, errors) = parser.parse();
 
     {
         let printer = ast::Printer::new();

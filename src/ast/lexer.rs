@@ -17,6 +17,10 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn current_line(&self) -> usize {
+        self.current_line
+    }
+
     fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
@@ -112,6 +116,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    // We already know the first character is a whitespace before entering this function
     fn skip_newline(&mut self) {
         while self.position < self.input.len() {
             self.skip_whitespace();
