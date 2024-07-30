@@ -1,6 +1,7 @@
-use crate::tokens::{Lexer, Token};
+use std::mem;
 
 use super::{BinaryOperator, Expression, Program, Statement};
+use super::{Lexer, Token};
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -21,19 +22,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_factor(&mut self) -> Option<Expression> {
-        match &self.current_token {
+        match mem::take(&mut self.current_token) {
             Some(Token::Number(n)) => {
-                let n = *n;
                 self.current_token = self.lexer.next_token();
                 Some(Expression::NumberLiteral(n))
             }
             Some(Token::Identifier(v)) => {
-                let v = v.clone();
                 self.current_token = self.lexer.next_token();
                 Some(Expression::Variable(v))
             }
             Some(Token::String(s)) => {
-                let s = s.clone();
                 self.current_token = self.lexer.next_token();
                 Some(Expression::StringLiteral(s))
             }
@@ -47,7 +45,10 @@ impl<'a> Parser<'a> {
                 }
                 res
             }
-            _ => None,
+            other => {
+                self.current_token = other;
+                None
+            }
         }
     }
 
@@ -190,20 +191,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_let(&mut self) -> Option<Statement> {
-        let variable = match &self.current_token {
+        let variable = match mem::take(&mut self.current_token) {
             Some(Token::Let) => {
                 self.current_token = self.lexer.next_token();
 
-                let variable = match &self.current_token {
-                    Some(Token::Identifier(v)) => v.clone(),
+                let variable = match mem::take(&mut self.current_token) {
+                    Some(Token::Identifier(v)) => v,
                     _ => panic!("Expected variable name after LET"),
                 };
 
                 variable
             }
-            Some(Token::Identifier(v)) => v.clone(),
-            _ => {
+            Some(Token::Identifier(v)) => v,
+            other => {
                 // LET keyword is optional
+                self.current_token = other;
                 return None;
             }
         };
@@ -260,8 +262,8 @@ impl<'a> Parser<'a> {
             self.current_token = self.lexer.next_token();
         }
 
-        let variable = match &self.current_token {
-            Some(Token::Identifier(v)) => v.clone(),
+        let variable = match mem::take(&mut self.current_token) {
+            Some(Token::Identifier(v)) => v,
             _ => panic!("Expected variable name after INPUT"),
         };
 
@@ -365,8 +367,8 @@ impl<'a> Parser<'a> {
         }
 
         self.current_token = self.lexer.next_token();
-        let variable = match &self.current_token {
-            Some(Token::Identifier(v)) => v.clone(),
+        let variable = match mem::take(&mut self.current_token) {
+            Some(Token::Identifier(v)) => v,
             _ => panic!("Expected variable name after FOR"),
         };
 
@@ -415,8 +417,8 @@ impl<'a> Parser<'a> {
         }
 
         self.current_token = self.lexer.next_token();
-        let variable = match &self.current_token {
-            Some(Token::Identifier(v)) => v.clone(),
+        let variable = match mem::take(&mut self.current_token) {
+            Some(Token::Identifier(v)) => v,
             _ => panic!("Expected variable name after NEXT"),
         };
 
@@ -470,13 +472,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_comment(&mut self) -> Option<Statement> {
-        match &self.current_token {
+        match mem::take(&mut self.current_token) {
             Some(Token::Rem(s)) => {
-                let s = s.clone();
                 self.current_token = self.lexer.next_token();
                 Some(Statement::Rem { content: s })
             }
-            _ => None,
+            other => {
+                self.current_token = other;
+                None
+            }
         }
     }
 

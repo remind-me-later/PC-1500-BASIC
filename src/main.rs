@@ -2,14 +2,13 @@
 mod ast;
 mod cfg;
 mod tac;
-mod tokens;
 
 // TODO: use clap for argument parsing
 fn main() {
     // Read file from first argument
     let input = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
-    let mut tokens = tokens::Lexer::new(&input);
+    let mut tokens = ast::Lexer::new(&input);
 
     println!("Tokens: ");
     while let Some(token) = tokens.next_token() {
