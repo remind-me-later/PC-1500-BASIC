@@ -23,34 +23,34 @@ impl<'a> Expression {
     }
 }
 
-pub trait StatementVisitor<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression);
-    fn visit_print(&mut self, content: &'a [Expression]);
-    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str);
-    fn visit_goto(&mut self, line_number: u32);
+pub trait StatementVisitor<'a, RetTy = ()> {
+    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression) -> RetTy;
+    fn visit_print(&mut self, content: &'a [Expression]) -> RetTy;
+    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) -> RetTy;
+    fn visit_goto(&mut self, line_number: u32) -> RetTy;
     fn visit_for(
         &mut self,
         variable: &'a str,
         from: &'a Expression,
         to: &'a Expression,
         step: Option<&'a Expression>,
-    );
-    fn visit_next(&mut self, variable: &'a str);
-    fn visit_end(&mut self);
-    fn visit_gosub(&mut self, line_number: u32);
-    fn visit_return(&mut self);
+    ) -> RetTy;
+    fn visit_next(&mut self, variable: &'a str) -> RetTy;
+    fn visit_end(&mut self) -> RetTy;
+    fn visit_gosub(&mut self, line_number: u32) -> RetTy;
+    fn visit_return(&mut self) -> RetTy;
     fn visit_if(
         &mut self,
         condition: &'a Expression,
         then: &'a Statement,
         else_: Option<&'a Statement>,
-    );
-    fn visit_seq(&mut self, statements: &'a [Statement]);
-    fn visit_rem(&mut self, content: &'a str);
+    ) -> RetTy;
+    fn visit_seq(&mut self, statements: &'a [Statement]) -> RetTy;
+    fn visit_rem(&mut self, content: &'a str) -> RetTy;
 }
 
 impl<'a> Statement {
-    pub fn accept<V: StatementVisitor<'a>>(&'a self, visitor: &mut V) {
+    pub fn accept<V: StatementVisitor<'a, RetTy>, RetTy>(&'a self, visitor: &mut V) -> RetTy {
         match self {
             Statement::Let {
                 variable,
@@ -80,12 +80,12 @@ impl<'a> Statement {
     }
 }
 
-pub trait ProgramVisitor<'a> {
-    fn visit_program(&mut self, program: &'a Program);
+pub trait ProgramVisitor<'a, RetTy = ()> {
+    fn visit_program(&mut self, program: &'a Program) -> RetTy;
 }
 
 impl<'a> Program {
-    pub fn accept<V: ProgramVisitor<'a>>(&'a self, visitor: &mut V) {
-        visitor.visit_program(self);
+    pub fn accept<V: ProgramVisitor<'a, RetTy>, RetTy>(&'a self, visitor: &mut V) -> RetTy {
+        visitor.visit_program(self)
     }
 }

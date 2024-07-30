@@ -117,6 +117,11 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
     fn visit_next(&mut self, variable: &'a str) {
         self.indent -= 1;
 
+        // TODO: should be ok
+        if self.output.chars().last() == Some('\t') {
+            self.output.pop();
+        }
+
         self.output.push_str("NEXT ");
         self.output.push_str(variable);
     }
@@ -151,15 +156,12 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
     }
 
     fn visit_seq(&mut self, statements: &'a [Statement]) {
-        // colon separated list
-        self.output.push('(');
         for (i, statement) in statements.iter().enumerate() {
             if i > 0 {
                 self.output.push_str(": ");
             }
             statement.accept(self);
         }
-        self.output.push(')');
     }
 
     fn visit_rem(&mut self, content: &'a str) {
