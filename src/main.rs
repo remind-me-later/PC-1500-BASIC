@@ -22,7 +22,11 @@ fn main() {
 
     let (program, errors) = parser.parse();
 
-    {
+    if !errors.is_empty() {
+        for error in errors {
+            println!("{}", error);
+        }
+    } else {
         let printer = ast::Printer::new();
         let output = printer.build(&program);
         println!("Ast:\n{}", output);

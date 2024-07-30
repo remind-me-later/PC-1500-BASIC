@@ -309,7 +309,6 @@ impl<'a> Parser<'a> {
         let variable = match mem::take(&mut self.current_token) {
             Some(Token::Identifier(v)) => v,
             _ => {
-                // panic!("Expected variable name after INPUT"),
                 return Err(Error {
                     kind: ErrorKind::ExpectedIdentifier,
                     line: self.lexer.current_line(),
@@ -588,7 +587,12 @@ impl<'a> Parser<'a> {
                 self.current_token = self.lexer.next();
             }
             None => {}
-            _ => panic!("Expected end of line, found {:?}", self.current_token),
+            _ => {
+                return Err(Error {
+                    kind: ErrorKind::ExpectedEndOfLine,
+                    line: self.lexer.current_line(),
+                });
+            }
         }
 
         Ok((line_number, statement))
