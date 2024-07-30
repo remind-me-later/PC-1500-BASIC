@@ -24,20 +24,14 @@ impl<'a> Lexer<'a> {
             return None;
         }
 
-        let token = match self.input.bytes().nth(self.position) {
+        let token = match self.input.as_bytes().get(self.position) {
             Some(c) if c.is_ascii_alphabetic() => self.identifier(),
-            Some(c) if c.is_ascii_digit() => {
-                if let Some(token) = self.number().ok() {
-                    token
-                } else {
-                    panic!("Invalid number at line {}", self.current_line)
-                }
-            }
-            Some(b'"') => {
-                self.position += 1;
-                self.string()
-                    .unwrap_or_else(|_| panic!("Unterminated string at line {}", self.current_line))
-            }
+            Some(c) if c.is_ascii_digit() => self
+                .number()
+                .unwrap_or_else(|_| panic!("Invalid number at line {}", self.current_line)),
+            Some(b'"') => self
+                .string()
+                .unwrap_or_else(|_| panic!("Unterminated string at line {}", self.current_line)),
             Some(b'+') => {
                 self.position += 1;
                 Token::Plus
@@ -55,10 +49,10 @@ impl<'a> Lexer<'a> {
                 Token::Slash
             }
             Some(b'<') => {
-                if self.input.bytes().nth(self.position + 1) == Some(b'>') {
+                if self.input.as_bytes().get(self.position + 1) == Some(&b'>') {
                     self.position += 2;
                     Token::Diamond
-                } else if self.input.bytes().nth(self.position + 1) == Some(b'=') {
+                } else if self.input.as_bytes().get(self.position + 1) == Some(&b'=') {
                     self.position += 2;
                     Token::LessOrEqual
                 } else {
@@ -67,7 +61,7 @@ impl<'a> Lexer<'a> {
                 }
             }
             Some(b'>') => {
-                if self.input.bytes().nth(self.position + 1) == Some(b'=') {
+                if self.input.as_bytes().get(self.position + 1) == Some(&b'=') {
                     self.position += 2;
                     Token::GreaterOrEqual
                 } else {
@@ -101,7 +95,7 @@ impl<'a> Lexer<'a> {
             }
             _ => panic!(
                 "Unexpected character '{}' at line {}",
-                self.input.bytes().nth(self.position).unwrap(),
+                self.input.as_bytes().get(self.position).unwrap(),
                 self.current_line
             ),
         };
@@ -111,7 +105,7 @@ impl<'a> Lexer<'a> {
 
     fn skip_whitespace(&mut self) {
         while self.position < self.input.len() {
-            match self.input.bytes().nth(self.position) {
+            match self.input.as_bytes().get(self.position) {
                 Some(b' ' | b'\t') => self.position += 1,
                 _ => break,
             }
@@ -121,7 +115,7 @@ impl<'a> Lexer<'a> {
     fn skip_newline(&mut self) {
         while self.position < self.input.len() {
             self.skip_whitespace();
-            match self.input.bytes().nth(self.position) {
+            match self.input.as_bytes().get(self.position) {
                 Some(b'\n' | b'\r') => {
                     self.current_line += 1;
                     self.position += 1;
@@ -135,7 +129,7 @@ impl<'a> Lexer<'a> {
     fn identifier(&mut self) -> Token {
         let mut len = 1;
 
-        for char in self.input[self.position + 1..].bytes() {
+        for &char in self.input[self.position + 1..].as_bytes() {
             if char.is_ascii_alphabetic() {
                 len += 1;
             } else if char == b'$' {
@@ -176,9 +170,9 @@ impl<'a> Lexer<'a> {
     // We already know the first character is a digit before entering this function
     fn number(&mut self) -> Result<Token, ()> {
         let mut len = 1;
-        let mut chars = self.input[self.position + 1..].bytes();
+        let chars = self.input.as_bytes().get(self.position + 1..).unwrap();
 
-        for char in chars.by_ref() {
+        for &char in chars.iter() {
             if char.is_ascii_digit() {
                 len += 1;
             } else {
@@ -192,12 +186,13 @@ impl<'a> Lexer<'a> {
         Ok(Token::Number(num.parse().map_err(|_| ())?))
     }
 
+    // We already know the first character is a double quote before entering this function
     fn string(&mut self) -> Result<Token, ()> {
-        let mut len = 0;
         let mut found_end = false;
-        let mut chars = self.input[self.position..].bytes();
+        let mut len = 1;
+        let chars = self.input.as_bytes().get(self.position + 1..).unwrap();
 
-        for char in chars.by_ref() {
+        for &char in chars.iter() {
             if char == b'"' {
                 len += 1;
                 found_end = true;
@@ -218,9 +213,9 @@ impl<'a> Lexer<'a> {
 
     fn comment(&mut self) -> Token {
         let mut len = 0;
-        let mut chars = self.input[self.position..].bytes();
+        let chars = self.input.as_bytes().get(self.position..).unwrap();
 
-        for char in chars.by_ref() {
+        for &char in chars.iter() {
             if char == b'\n' || char == b'\r' {
                 break;
             } else {
