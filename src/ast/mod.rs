@@ -1,4 +1,4 @@
-mod ast;
+mod node;
 mod lexer;
 mod parser;
 mod printer;
@@ -6,7 +6,7 @@ mod semantics;
 mod token;
 mod visitor;
 
-pub use ast::{BinaryOperator, Expression, Program, Statement};
+pub use node::{BinaryOperator, Expression, Program, Statement};
 pub use lexer::Lexer;
 pub use parser::Parser;
 pub use printer::Printer;
