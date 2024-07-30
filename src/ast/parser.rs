@@ -111,8 +111,12 @@ impl<'a> Parser<'a> {
     fn parse_comparison(&mut self) -> Option<Expression> {
         let mut left = self.parse_add_sub()?;
 
-        while let Some(Token::Equal) | Some(Token::Diamond) | Some(Token::LessThan) | Some(Token::LessOrEqual)
-        | Some(Token::GreaterThan) | Some(Token::GreaterOrEqual) = self.current_token
+        while let Some(Token::Equal)
+        | Some(Token::Diamond)
+        | Some(Token::LessThan)
+        | Some(Token::LessOrEqual)
+        | Some(Token::GreaterThan)
+        | Some(Token::GreaterOrEqual) = self.current_token
         {
             let op = match self.current_token {
                 Some(Token::Equal) => BinaryOperator::Eq,
