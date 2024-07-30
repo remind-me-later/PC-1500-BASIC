@@ -1,431 +1,521 @@
+use crate::tokens::{Lexer, Token};
+
 use super::{BinaryOperator, Expression, Program, Statement};
-use nom::{
-    branch::alt,
-    bytes::complete::{tag, take_while},
-    character::complete::{alpha1, alphanumeric0, digit1, multispace0, multispace1, space1},
-    combinator::{map, map_res, opt, recognize},
-    multi::separated_list1,
-    sequence::{delimited, preceded, tuple},
-    IResult,
-};
-use std::str::FromStr;
 
-pub fn parse(input: &str) -> IResult<&str, Program> {
-    let (input, program) = parse_program(input)?;
-
-    Ok((input, program))
+pub struct Parser<'a> {
+    lexer: Lexer<'a>,
+    current_token: Option<Token>,
 }
 
-fn parse_line_number(input: &str) -> IResult<&str, u32> {
-    map_res(digit1, u32::from_str)(input)
-}
-
-fn parse_number(input: &str) -> IResult<&str, i32> {
-    map_res(digit1, i32::from_str)(input)
-}
-
-fn parse_string_literal(input: &str) -> IResult<&str, String> {
-    let (input, content) = delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""))(input)?;
-
-    Ok((input, content.to_string()))
-}
-
-// variables are sequences of alphabetic characters, optionally followed by a dollar sign, to indicate a string variable
-fn parse_variable(input: &str) -> IResult<&str, String> {
-    let (input, name) = recognize(tuple((alpha1, alphanumeric0, opt(tag("$")))))(input)?;
-    Ok((input, name.to_string()))
-}
-
-fn parse_factor(input: &str) -> IResult<&str, Expression> {
-    let (input, expr) = alt((
-        map(parse_number, Expression::NumberLiteral),
-        map(parse_variable, Expression::Variable),
-        map(parse_string_literal, Expression::StringLiteral),
-        parse_parens_expression,
-    ))(input)?;
-
-    Ok((input, expr))
-}
-
-fn parse_parens_expression(input: &str) -> IResult<&str, Expression> {
-    let (input, expr) = delimited(
-        tag("("),
-        delimited(multispace0, parse_expression, multispace0),
-        tag(")"),
-    )(input)?;
-
-    Ok((input, expr))
-}
-
-fn parse_mul_div(input: &str) -> IResult<&str, Expression> {
-    fn parse_mul_div_sign(input: &str) -> IResult<&str, BinaryOperator> {
-        alt((
-            map(tag("*"), |_| BinaryOperator::Mul),
-            map(tag("/"), |_| BinaryOperator::Div),
-        ))(input)
+impl<'a> Parser<'a> {
+    pub fn new(lexer: Lexer<'a>) -> Self {
+        Self {
+            lexer,
+            current_token: None,
+        }
     }
 
-    let (input, left) = parse_factor(input)?;
-
-    // try to parse a multiplication or division operator
-    let (input, right) = opt(move |i| {
-        let (i, _) = multispace0(i)?;
-        let (i, op) = parse_mul_div_sign(i)?;
-        let (i, _) = multispace0(i)?;
-        let (i, right) = parse_mul_div(i)?;
-
-        Ok((i, (op, right)))
-    })(input)?;
-
-    // if we didn't find an operator, return the left expression
-    if let Some((op, right)) = right {
-        let left = Box::new(left);
-        let right = Box::new(right);
-        Ok((input, Expression::Binary { left, op, right }))
-    } else {
-        Ok((input, left))
-    }
-}
-
-fn parse_add_sub(input: &str) -> IResult<&str, Expression> {
-    fn parse_add_sub_sign(input: &str) -> IResult<&str, BinaryOperator> {
-        alt((
-            map(tag("+"), |_| BinaryOperator::Add),
-            map(tag("-"), |_| BinaryOperator::Sub),
-        ))(input)
+    pub fn parse(&mut self) -> Program {
+        self.current_token = self.lexer.next_token();
+        self.parse_program()
     }
 
-    let (input, left) = parse_mul_div(input)?;
-
-    // try to parse an addition or subtraction operator
-    let (input, right) = opt(move |i| {
-        let (i, _) = multispace0(i)?;
-        let (i, op) = parse_add_sub_sign(i)?;
-        let (i, _) = multispace0(i)?;
-        let (i, right) = parse_add_sub(i)?;
-
-        Ok((i, (op, right)))
-    })(input)?;
-
-    // if we didn't find an operator, return the left expression
-    if let Some((op, right)) = right {
-        let left = Box::new(left);
-        let right = Box::new(right);
-        Ok((input, Expression::Binary { left, op, right }))
-    } else {
-        Ok((input, left))
-    }
-}
-
-fn parse_comparison(input: &str) -> IResult<&str, Expression> {
-    fn parse_comparison_sign(input: &str) -> IResult<&str, BinaryOperator> {
-        alt((
-            map(tag("="), |_| BinaryOperator::Eq),
-            map(tag("<>"), |_| BinaryOperator::Ne),
-            map(tag("<="), |_| BinaryOperator::Le),
-            map(tag(">="), |_| BinaryOperator::Ge),
-            map(tag("<"), |_| BinaryOperator::Lt),
-            map(tag(">"), |_| BinaryOperator::Gt),
-        ))(input)
+    fn parse_factor(&mut self) -> Option<Expression> {
+        match &self.current_token {
+            Some(Token::Number(n)) => {
+                let n = *n;
+                self.current_token = self.lexer.next_token();
+                Some(Expression::NumberLiteral(n))
+            }
+            Some(Token::Identifier(v)) => {
+                let v = v.clone();
+                self.current_token = self.lexer.next_token();
+                Some(Expression::Variable(v))
+            }
+            Some(Token::String(s)) => {
+                let s = s.clone();
+                self.current_token = self.lexer.next_token();
+                Some(Expression::StringLiteral(s))
+            }
+            Some(Token::LParen) => {
+                self.current_token = self.lexer.next_token();
+                let res = self.parse_expression();
+                if self.current_token == Some(Token::RParen) {
+                    self.current_token = self.lexer.next_token();
+                } else {
+                    panic!("Expected closing parenthesis");
+                }
+                res
+            }
+            _ => None,
+        }
     }
 
-    let (input, left) = parse_add_sub(input)?;
+    fn parse_mul_div(&mut self) -> Option<Expression> {
+        let mut left = self.parse_factor()?;
 
-    // try to parse a comparison operator
-    let (input, right) = opt(move |i| {
-        let (i, _) = multispace0(i)?;
-        let (i, op) = parse_comparison_sign(i)?;
-        let (i, _) = multispace0(i)?;
-        let (i, right) = parse_add_sub(i)?;
+        while let Some(Token::Star) | Some(Token::Slash) = self.current_token {
+            let op = match self.current_token {
+                Some(Token::Star) => BinaryOperator::Mul,
+                Some(Token::Slash) => BinaryOperator::Div,
+                _ => unreachable!(),
+            };
 
-        Ok((i, (op, right)))
-    })(input)?;
+            self.current_token = self.lexer.next_token();
+            let right = self.parse_factor();
+            let right = if let Some(right) = right {
+                right
+            } else {
+                panic!("Expected expression after operator {}", op);
+            };
 
-    // if we didn't find an operator, return the left expression
-    if let Some((op, right)) = right {
-        let left = Box::new(left);
-        let right = Box::new(right);
-        Ok((input, Expression::Binary { left, op, right }))
-    } else {
-        Ok((input, left))
+            left = Expression::Binary {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Some(left)
     }
-}
 
-fn parse_and(input: &str) -> IResult<&str, Expression> {
-    let (input, left) = parse_comparison(input)?;
+    fn parse_add_sub(&mut self) -> Option<Expression> {
+        let mut left = self.parse_mul_div()?;
 
-    // try to parse an AND operator
-    let (input, right) = opt(move |i| {
-        let (i, _) = multispace0(i)?;
-        let (i, _) = tag("AND")(i)?;
-        let (i, _) = multispace0(i)?;
-        let (i, right) = parse_comparison(i)?;
+        while let Some(Token::Plus) | Some(Token::Minus) = self.current_token {
+            let op = match self.current_token {
+                Some(Token::Plus) => BinaryOperator::Add,
+                Some(Token::Minus) => BinaryOperator::Sub,
+                _ => unreachable!(),
+            };
 
-        Ok((i, right))
-    })(input)?;
+            self.current_token = self.lexer.next_token();
+            let right = self.parse_mul_div();
+            let right = if let Some(right) = right {
+                right
+            } else {
+                panic!("Expected expression after operator {}", op);
+            };
 
-    // if we didn't find an operator, return the left expression
-    if let Some(right) = right {
-        let left = Box::new(left);
-        let right = Box::new(right);
-        Ok((
-            input,
-            Expression::Binary {
-                left,
+            left = Expression::Binary {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Some(left)
+    }
+
+    fn parse_comparison(&mut self) -> Option<Expression> {
+        let mut left = self.parse_add_sub()?;
+
+        while let Some(Token::Eq) | Some(Token::Diamond) | Some(Token::Lt) | Some(Token::Le)
+        | Some(Token::Gt) | Some(Token::Ge) = self.current_token
+        {
+            let op = match self.current_token {
+                Some(Token::Eq) => BinaryOperator::Eq,
+                Some(Token::Diamond) => BinaryOperator::Ne,
+                Some(Token::Lt) => BinaryOperator::Lt,
+                Some(Token::Le) => BinaryOperator::Le,
+                Some(Token::Gt) => BinaryOperator::Gt,
+                Some(Token::Ge) => BinaryOperator::Ge,
+                _ => unreachable!(),
+            };
+
+            self.current_token = self.lexer.next_token();
+            let right = self.parse_add_sub();
+            let right = if let Some(right) = right {
+                right
+            } else {
+                panic!("Expected expression after operator {}", op);
+            };
+
+            left = Expression::Binary {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Some(left)
+    }
+
+    fn parse_and(&mut self) -> Option<Expression> {
+        let mut left = self.parse_comparison()?;
+
+        while self.current_token == Some(Token::And) {
+            self.current_token = self.lexer.next_token();
+            let right = self.parse_comparison();
+            let right = if let Some(right) = right {
+                right
+            } else {
+                panic!("Expected expression after AND");
+            };
+
+            left = Expression::Binary {
+                left: Box::new(left),
                 op: BinaryOperator::And,
-                right,
-            },
-        ))
-    } else {
-        Ok((input, left))
+                right: Box::new(right),
+            };
+        }
+
+        Some(left)
     }
-}
 
-fn parse_or(input: &str) -> IResult<&str, Expression> {
-    let (input, left) = parse_and(input)?;
+    fn parse_or(&mut self) -> Option<Expression> {
+        let mut left = self.parse_and()?;
 
-    // try to parse an OR operator
-    let (input, right) = opt(move |i| {
-        let (i, _) = multispace0(i)?;
-        let (i, _) = tag("OR")(i)?;
-        let (i, _) = multispace0(i)?;
-        let (i, right) = parse_and(i)?;
+        while self.current_token == Some(Token::Or) {
+            self.current_token = self.lexer.next_token();
+            let right = self.parse_and();
+            let right = if let Some(right) = right {
+                right
+            } else {
+                panic!("Expected expression after OR");
+            };
 
-        Ok((i, right))
-    })(input)?;
-
-    // if we didn't find an operator, return the left expression
-    if let Some(right) = right {
-        let left = Box::new(left);
-        let right = Box::new(right);
-        Ok((
-            input,
-            Expression::Binary {
-                left,
+            left = Expression::Binary {
+                left: Box::new(left),
                 op: BinaryOperator::Or,
-                right,
-            },
-        ))
-    } else {
-        Ok((input, left))
+                right: Box::new(right),
+            };
+        }
+
+        Some(left)
     }
-}
 
-fn parse_expression(input: &str) -> IResult<&str, Expression> {
-    parse_or(input)
-}
+    fn parse_expression(&mut self) -> Option<Expression> {
+        self.parse_or()
+    }
 
-fn parse_let(input: &str) -> IResult<&str, Statement> {
-    // LET keyoword is optional
-    let (input, _) = opt(tag("LET"))(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, variable) = parse_variable(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = tag("=")(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, expression) = parse_expression(input)?;
+    fn parse_let(&mut self) -> Option<Statement> {
+        let variable = match &self.current_token {
+            Some(Token::Let) => {
+                self.current_token = self.lexer.next_token();
 
-    Ok((
-        input,
-        Statement::Let {
+                let variable = match &self.current_token {
+                    Some(Token::Identifier(v)) => v.clone(),
+                    _ => panic!("Expected variable name after LET"),
+                };
+
+                variable
+            }
+            Some(Token::Identifier(v)) => v.clone(),
+            _ => {
+                // LET keyword is optional
+                return None;
+            }
+        };
+
+        self.current_token = self.lexer.next_token();
+        if self.current_token != Some(Token::Eq) {
+            panic!("Expected = after variable name");
+        }
+
+        self.current_token = self.lexer.next_token();
+        let expression = self.parse_expression();
+        let expression = if let Some(expression) = expression {
+            expression
+        } else {
+            panic!("Expected expression after =");
+        };
+
+        Some(Statement::Let {
             variable,
             expression,
-        },
-    ))
-}
+        })
+    }
 
-fn parse_print(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("PRINT")(input)?;
-    let (input, _) = space1(input)?;
+    fn parse_print(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::Print) {
+            return None;
+        }
 
-    // PRINT can be followed by multiple expressions or string literals separated by semicolons
-    let (input, content) = separated_list1(
-        // semi-colon followed by optional whitespace
-        delimited(tag(";"), multispace0, multispace0),
-        move |i| parse_expression(i),
-    )(input)?;
+        self.current_token = self.lexer.next_token();
+        let mut content = Vec::new();
 
-    Ok((input, Statement::Print { content }))
-}
+        while let Some(expr) = self.parse_expression() {
+            content.push(expr);
 
-// INPUT "name"; NAME$
-fn parse_input(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("INPUT")(input)?;
-    let (input, _) = space1(input)?;
+            if self.current_token == Some(Token::Semicolon) {
+                self.current_token = self.lexer.next_token();
+            } else {
+                break;
+            }
+        }
 
-    // get optional prompt
-    let (input, prompt) = opt(move |i| parse_expression(i))(input)?;
+        Some(Statement::Print { content })
+    }
 
-    // if a promtp was found, skip the semicolon and optional whitespace
-    let (input, _) = opt(delimited(tag(";"), multispace0, multispace0))(input)?;
-    let (input, variable) = parse_variable(input)?;
+    fn parse_input(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::Input) {
+            return None;
+        }
 
-    Ok((input, Statement::Input { prompt, variable }))
-}
+        self.current_token = self.lexer.next_token();
+        let prompt = self.parse_expression();
 
-fn parse_goto(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("GOTO")(input)?;
-    let (input, _) = space1(input)?;
-    let (input, line_number) = parse_line_number(input)?;
+        if self.current_token == Some(Token::Semicolon) {
+            self.current_token = self.lexer.next_token();
+        }
 
-    Ok((input, Statement::Goto { line_number }))
-}
+        let variable = match &self.current_token {
+            Some(Token::Identifier(v)) => v.clone(),
+            _ => panic!("Expected variable name after INPUT"),
+        };
 
-fn parse_gosub(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("GOSUB")(input)?;
-    let (input, _) = space1(input)?;
-    let (input, line_number) = parse_line_number(input)?;
+        self.current_token = self.lexer.next_token();
 
-    Ok((input, Statement::GoSub { line_number }))
-}
+        Some(Statement::Input { prompt, variable })
+    }
 
-fn parse_return(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("RETURN")(input)?;
+    fn parse_goto(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::Goto) {
+            return None;
+        }
 
-    Ok((input, Statement::Return))
-}
+        self.current_token = self.lexer.next_token();
+        let line_number = match &self.current_token {
+            Some(Token::Number(n)) => match u32::try_from(*n) {
+                Ok(n) => n,
+                Err(e) => {
+                    panic!("Goto line label must be convertible to u32: {:?}", e);
+                }
+            },
+            _ => panic!("Expected line number after GOTO"),
+        };
 
-fn parse_if(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("IF")(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, condition) = parse_expression(input)?;
-    let (input, _) = opt(preceded(space1, tag("THEN")))(input)?;
-    let (input, _) = space1(input)?;
+        self.current_token = self.lexer.next_token();
 
-    let (input, then) = parse_statement(input)?;
-    let then = Box::new(then);
+        Some(Statement::Goto { line_number })
+    }
 
-    let (input, else_) = opt(preceded(space1, move |i| {
-        let (i, _) = tag("ELSE")(i)?;
-        let (i, _) = space1(i)?;
-        let (i, else_) = parse_statement(i)?;
-        let else_ = Box::new(else_);
-        Ok((i, else_))
-    }))(input)?;
+    fn parse_gosub(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::Gosub) {
+            return None;
+        }
 
-    Ok((
-        input,
-        Statement::If {
+        self.current_token = self.lexer.next_token();
+        let line_number = match &self.current_token {
+            Some(Token::Number(n)) => match u32::try_from(*n) {
+                Ok(n) => n,
+                Err(e) => {
+                    panic!("Gosub line label must be convertible to u32: {:?}", e);
+                }
+            },
+            _ => panic!("Expected line number after GOSUB"),
+        };
+
+        self.current_token = self.lexer.next_token();
+
+        Some(Statement::GoSub { line_number })
+    }
+
+    fn parse_return(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::Return) {
+            return None;
+        }
+
+        self.current_token = self.lexer.next_token();
+
+        Some(Statement::Return)
+    }
+
+    fn parse_if(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::If) {
+            return None;
+        }
+
+        self.current_token = self.lexer.next_token();
+        let condition = match self.parse_expression() {
+            Some(expr) => expr,
+            None => panic!("Expected expression after IF"),
+        };
+
+        if self.current_token == Some(Token::Then) {
+            self.current_token = self.lexer.next_token();
+        }
+
+        let then = match self.parse_statement() {
+            Some(stmt) => Box::new(stmt),
+            None => panic!("Expected statement after THEN"),
+        };
+
+        let else_ = if self.current_token == Some(Token::Else) {
+            self.current_token = self.lexer.next_token();
+            match self.parse_statement() {
+                Some(stmt) => Some(Box::new(stmt)),
+                None => panic!("Expected statement after ELSE"),
+            }
+        } else {
+            None
+        };
+
+        Some(Statement::If {
             condition,
             then,
             else_,
-        },
-    ))
-}
+        })
+    }
 
-fn parse_for(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("FOR")(input)?;
-    let (input, _) = space1(input)?;
-    let (input, variable) = parse_variable(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = tag("=")(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, from) = parse_expression(input)?;
-    let (input, _) = space1(input)?;
-    let (input, _) = tag("TO")(input)?;
-    let (input, _) = space1(input)?;
-    let (input, to) = parse_expression(input)?;
-    let (input, step) = opt(preceded(space1, move |i| {
-        let (i, _) = tag("STEP")(i)?;
-        let (i, _) = space1(i)?;
-        let (i, step) = parse_expression(i)?;
-        Ok((i, step))
-    }))(input)?;
+    fn parse_for(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::For) {
+            return None;
+        }
 
-    Ok((
-        input,
-        Statement::For {
+        self.current_token = self.lexer.next_token();
+        let variable = match &self.current_token {
+            Some(Token::Identifier(v)) => v.clone(),
+            _ => panic!("Expected variable name after FOR"),
+        };
+
+        self.current_token = self.lexer.next_token();
+        if self.current_token != Some(Token::Eq) {
+            panic!("Expected = after variable name");
+        }
+
+        self.current_token = self.lexer.next_token();
+        let from = match self.parse_expression() {
+            Some(expr) => expr,
+            None => panic!("Expected expression after ="),
+        };
+
+        if self.current_token != Some(Token::To) {
+            panic!("Expected TO after FROM");
+        }
+
+        self.current_token = self.lexer.next_token();
+        let to = match self.parse_expression() {
+            Some(expr) => expr,
+            None => panic!("Expected expression after TO"),
+        };
+
+        let step = if self.current_token == Some(Token::Step) {
+            self.current_token = self.lexer.next_token();
+            match self.parse_expression() {
+                Some(expr) => Some(expr),
+                None => panic!("Expected expression after STEP"),
+            }
+        } else {
+            None
+        };
+
+        Some(Statement::For {
             variable,
             from,
             to,
             step,
-        },
-    ))
-}
-
-fn parse_next(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("NEXT")(input)?;
-    let (input, _) = space1(input)?;
-    let (input, variable) = parse_variable(input)?;
-
-    Ok((input, Statement::Next { variable }))
-}
-
-fn parse_end(input: &str) -> IResult<&str, Statement> {
-    map(tag("END"), |_| Statement::End)(input)
-}
-
-fn parse_atomic_statement(input: &str) -> IResult<&str, Statement> {
-    alt((
-        parse_let,
-        parse_print,
-        parse_input,
-        parse_goto,
-        parse_for,
-        parse_next,
-        parse_end,
-        parse_gosub,
-        parse_if,
-        parse_return,
-    ))(input)
-}
-
-fn parse_statement(input: &str) -> IResult<&str, Statement> {
-    let (input, statements) = separated_list1(
-        preceded(multispace0, tag(":")),
-        preceded(multispace0, parse_atomic_statement),
-    )(input)?;
-
-    if statements.len() == 1 {
-        let statement = statements.into_iter().next().unwrap();
-        Ok((input, statement))
-    } else {
-        Ok((input, Statement::Seq { statements }))
-    }
-}
-
-// Comment lines start with REM
-fn parse_comment(input: &str) -> IResult<&str, ()> {
-    let (input, _) = tag("REM")(input)?;
-    let (input, _) = take_while(|c: char| c != '\n')(input)?;
-
-    Ok((input, ()))
-}
-
-fn parse_comment_line(input: &str) -> IResult<&str, ()> {
-    let (input, _) = tuple((parse_line_number, multispace1, parse_comment))(input)?;
-
-    Ok((input, ()))
-}
-
-fn parse_line(input: &str) -> IResult<&str, (u32, Statement)> {
-    let (input, (number, _, statement)) =
-        tuple((parse_line_number, multispace1, parse_statement))(input)?;
-
-    Ok((input, (number, statement)))
-}
-
-fn parse_program(input: &str) -> IResult<&str, Program> {
-    let mut program = Program::new();
-    let mut input = input;
-
-    // TODO: improve this loop
-    while !input.is_empty() {
-        let (new_input, _) = multispace0(input)?;
-        if new_input.is_empty() {
-            break;
-        }
-
-        let (new_input, _) = opt(parse_comment_line)(new_input)?;
-        let (new_input, _) = multispace0(new_input)?;
-        if new_input.is_empty() {
-            break;
-        }
-
-        let (new_input, (line_number, statement)) = parse_line(new_input)?;
-        program.add_line(line_number, statement);
-        input = new_input;
+        })
     }
 
-    Ok((input, program))
+    fn parse_next(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::Next) {
+            return None;
+        }
+
+        self.current_token = self.lexer.next_token();
+        let variable = match &self.current_token {
+            Some(Token::Identifier(v)) => v.clone(),
+            _ => panic!("Expected variable name after NEXT"),
+        };
+
+        self.current_token = self.lexer.next_token();
+
+        Some(Statement::Next { variable })
+    }
+
+    fn parse_end(&mut self) -> Option<Statement> {
+        if self.current_token != Some(Token::End) {
+            return None;
+        }
+
+        self.current_token = self.lexer.next_token();
+
+        Some(Statement::End)
+    }
+
+    fn parse_atomic_statement(&mut self) -> Option<Statement> {
+        self.parse_let()
+            .or_else(|| self.parse_print())
+            .or_else(|| self.parse_input())
+            .or_else(|| self.parse_goto())
+            .or_else(|| self.parse_for())
+            .or_else(|| self.parse_next())
+            .or_else(|| self.parse_end())
+            .or_else(|| self.parse_gosub())
+            .or_else(|| self.parse_if())
+            .or_else(|| self.parse_return())
+            .or_else(|| self.parse_comment())
+    }
+
+    fn parse_statement(&mut self) -> Option<Statement> {
+        let mut statements = Vec::new();
+
+        while let Some(stmt) = self.parse_atomic_statement() {
+            statements.push(stmt);
+
+            if self.current_token == Some(Token::Colon) {
+                self.current_token = self.lexer.next_token();
+            } else {
+                break;
+            }
+        }
+
+        if statements.len() == 1 {
+            Some(statements.remove(0))
+        } else {
+            Some(Statement::Seq { statements })
+        }
+    }
+
+    fn parse_comment(&mut self) -> Option<Statement> {
+        match &self.current_token {
+            Some(Token::Rem(s)) => {
+                let s = s.clone();
+                self.current_token = self.lexer.next_token();
+                Some(Statement::Rem { content: s })
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_line(&mut self) -> Option<(u32, Statement)> {
+        let line_number = match &self.current_token {
+            Some(Token::Number(n)) => {
+                if let Ok(n) = u32::try_from(*n) {
+                    n
+                } else {
+                    panic!("Line number must be convertible to u32");
+                }
+            }
+            _ => return None,
+        };
+
+        self.current_token = self.lexer.next_token();
+        let statement = match self.parse_statement() {
+            Some(stmt) => stmt,
+            None => panic!("Expected statement after line number"),
+        };
+
+        match self.current_token {
+            Some(Token::Eol) => {
+                self.current_token = self.lexer.next_token();
+            }
+            None => {}
+            _ => panic!("Expected end of line, found {:?}", self.current_token),
+        }
+
+        Some((line_number, statement))
+    }
+
+    fn parse_program(&mut self) -> Program {
+        let mut program = Program::new();
+
+        while let Some((line_number, statement)) = self.parse_line() {
+            program.add_line(line_number, statement);
+        }
+
+        program
+    }
 }

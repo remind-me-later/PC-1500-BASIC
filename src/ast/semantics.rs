@@ -225,6 +225,8 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
             statement.accept(self);
         }
     }
+
+    fn visit_rem(&mut self, _: &'a str) {}
 }
 
 impl<'a> ProgramVisitor<'a> for SemanticChecker<'a> {

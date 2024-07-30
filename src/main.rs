@@ -9,30 +9,31 @@ fn main() {
     // Read file from first argument
     let input = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
-    let mut tokens = tokens::Lexer::new(&input);
+    let tokens = tokens::Lexer::new(&input);
 
-    while let Some(token) = tokens.next_token() {
-        print!("{} ", token);
-    }
-    println!();
-
-    // match ast::parse(&input) {
-    //     Ok((_, program)) => {
-    //         let printer = ast::Printer::new();
-    //         let output = printer.build(&program);
-    //         println!("Ast:\n{}", output);
-    //         let type_checker = ast::SemanticChecker::new(&program);
-    //         type_checker.check().unwrap();
-    //         let (tac, const_data) = tac::Builder::new(&program).build();
-
-    //         println!("data:\n{:?}\n", const_data);
-    //         println!("start:\n{}", tac);
-
-    //         let mut cfg = cfg::Builder::new(tac).build();
-    //         println!("Original CFG:\n{}", cfg);
-    //         cfg.constant_fold();
-    //         println!("Constant folded cfg:\n{}", cfg);
-    //     }
-    //     Err(err) => eprintln!("Error parsing program: {:?}", err),
+    // while let Some(token) = tokens.next_token() {
+    //     print!("{} ", token);
     // }
+    // println!();
+
+    let mut parser = ast::Parser::new(tokens);
+
+    let program = parser.parse();
+
+    {
+        let printer = ast::Printer::new();
+        let output = printer.build(&program);
+        println!("Ast:\n{}", output);
+        let sem_checker = ast::SemanticChecker::new(&program);
+        sem_checker.check().unwrap();
+        // let (tac, const_data) = tac::Builder::new(&program).build();
+
+        // println!("data:\n{:?}\n", const_data);
+        // println!("start:\n{}", tac);
+
+        // let mut cfg = cfg::Builder::new(tac).build();
+        // println!("Original CFG:\n{}", cfg);
+        // cfg.constant_fold();
+        // println!("Constant folded cfg:\n{}", cfg);
+    }
 }

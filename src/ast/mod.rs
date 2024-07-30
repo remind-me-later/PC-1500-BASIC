@@ -5,7 +5,7 @@ mod printer;
 mod semantics;
 mod visitor;
 
-pub use parser::parse;
+pub use parser::Parser;
 pub use printer::Printer;
 pub use semantics::SemanticChecker;
 pub use visitor::{ExpressionVisitor, ProgramVisitor, StatementVisitor};
@@ -111,6 +111,9 @@ pub enum Statement {
     },
     Seq {
         statements: Vec<Statement>,
+    },
+    Rem {
+        content: String,
     },
 }
 

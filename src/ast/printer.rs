@@ -83,9 +83,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
     fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) {
         self.output.push_str("INPUT ");
         if let Some(prompt) = prompt {
-            self.output.push('"');
             prompt.accept(self);
-            self.output.push('"');
             self.output.push_str("; ");
         }
         self.output.push_str(variable);
@@ -162,6 +160,10 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
             statement.accept(self);
         }
         self.output.push(')');
+    }
+
+    fn visit_rem(&mut self, content: &'a str) {
+        self.output.push_str(format!("REM {}", content).as_str());
     }
 }
 

@@ -388,6 +388,10 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             stmt.accept(self);
         }
     }
+
+    fn visit_rem(&mut self, _: &'a str) {
+        // Do nothing
+    }
 }
 
 impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {

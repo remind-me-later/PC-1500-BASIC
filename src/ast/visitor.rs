@@ -46,6 +46,7 @@ pub trait StatementVisitor<'a> {
         else_: Option<&'a Statement>,
     );
     fn visit_seq(&mut self, statements: &'a [Statement]);
+    fn visit_rem(&mut self, content: &'a str);
 }
 
 impl<'a> Statement {
@@ -74,6 +75,7 @@ impl<'a> Statement {
                 else_,
             } => visitor.visit_if(condition, then, else_.as_deref()),
             Statement::Seq { statements } => visitor.visit_seq(statements),
+            Statement::Rem { content } => visitor.visit_rem(content),
         }
     }
 }

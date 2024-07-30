@@ -1,9 +1,12 @@
 use core::panic;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
     // Keywords
     Let,
     Goto,
+    Gosub,
+    Return,
     If,
     Else,
     Then,
@@ -22,6 +25,8 @@ pub enum Token {
     Minus,
     Star,
     Slash,
+    And,
+    Or,
     // Comparison operators
     Eq,
     Diamond,
@@ -32,6 +37,8 @@ pub enum Token {
     // Punctuation
     Semicolon,
     Colon,
+    LParen,
+    RParen,
     // Other
     Identifier(String),
     Number(i32),
@@ -46,6 +53,8 @@ impl std::fmt::Display for Token {
             // Keywords
             Token::Let => write!(f, "LET"),
             Token::Goto => write!(f, "GOTO"),
+            Token::Gosub => write!(f, "GOSUB"),
+            Token::Return => write!(f, "RETURN"),
             Token::If => write!(f, "IF"),
             Token::Else => write!(f, "ELSE"),
             Token::Then => write!(f, "THEN"),
@@ -64,6 +73,8 @@ impl std::fmt::Display for Token {
             Token::Minus => write!(f, "-"),
             Token::Star => write!(f, "*"),
             Token::Slash => write!(f, "/"),
+            Token::And => write!(f, "AND"),
+            Token::Or => write!(f, "OR"),
             // Comparison operators
             Token::Eq => write!(f, "="),
             Token::Diamond => write!(f, "<>"),
@@ -74,6 +85,8 @@ impl std::fmt::Display for Token {
             // Punctuation
             Token::Semicolon => write!(f, ";"),
             Token::Colon => write!(f, ":"),
+            Token::LParen => write!(f, "("),
+            Token::RParen => write!(f, ")"),
             // Other
             Token::Identifier(ident) => write!(f, "{}", ident),
             Token::Number(num) => write!(f, "{}", num),
@@ -95,7 +108,30 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Option<Token> {
-        self.lex()
+        self.skip_whitespace();
+
+        if self.position >= self.input.len() {
+            return None;
+        }
+
+        let token = self
+            .read_comment()
+            .or_else(|| self.read_keyword())
+            .or_else(|| self.read_number())
+            .or_else(|| self.read_string())
+            .or_else(|| self.read_identifier())
+            .or_else(|| self.lex_operator())
+            .or_else(|| self.lex_punctuation())
+            .or_else(|| self.lex_misc());
+
+        if token.is_none() {
+            panic!(
+                "Unexpected character: {}",
+                self.input.chars().nth(self.position).unwrap()
+            );
+        }
+
+        token
     }
 
     fn skip_whitespace(&mut self) {
@@ -219,6 +255,12 @@ impl<'a> Lexer<'a> {
         } else if self.input[self.position..].starts_with("GOTO") {
             len += 4;
             Token::Goto
+        } else if self.input[self.position..].starts_with("GOSUB") {
+            len += 5;
+            Token::Gosub
+        } else if self.input[self.position..].starts_with("RETURN") {
+            len += 6;
+            Token::Return
         } else if self.input[self.position..].starts_with("IF") {
             len += 2;
             Token::If
@@ -258,6 +300,14 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_operator(&mut self) -> Option<Token> {
+        if self.input[self.position..].starts_with("AND") {
+            self.position += 3;
+            return Some(Token::And);
+        } else if self.input[self.position..].starts_with("OR") {
+            self.position += 2;
+            return Some(Token::Or);
+        }
+
         let operator = match self.input.chars().nth(self.position) {
             Some('+') => Token::Plus,
             Some('-') => Token::Minus,
@@ -294,6 +344,8 @@ impl<'a> Lexer<'a> {
         let punctuation = match self.input.chars().nth(self.position) {
             Some(';') => Token::Semicolon,
             Some(':') => Token::Colon,
+            Some('(') => Token::LParen,
+            Some(')') => Token::RParen,
             _ => return None,
         };
 
@@ -309,32 +361,5 @@ impl<'a> Lexer<'a> {
 
         self.position += 1;
         Some(token)
-    }
-
-    fn lex(&mut self) -> Option<Token> {
-        self.skip_whitespace();
-
-        if self.position >= self.input.len() {
-            return None;
-        }
-
-        let token = self
-            .read_comment()
-            .or_else(|| self.read_keyword())
-            .or_else(|| self.read_number())
-            .or_else(|| self.read_string())
-            .or_else(|| self.read_identifier())
-            .or_else(|| self.lex_operator())
-            .or_else(|| self.lex_punctuation())
-            .or_else(|| self.lex_misc());
-
-        if token.is_none() {
-            panic!(
-                "Unexpected character: {}",
-                self.input.chars().nth(self.position).unwrap()
-            );
-        }
-
-        token
     }
 }
