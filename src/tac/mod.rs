@@ -6,14 +6,18 @@ pub use visitor::{OperandVisitor, ProgramVisitor, TacVisitor};
 
 use crate::ast;
 
-pub const START_LABEL: u32 = 0;
-pub const BEGIN_OF_BUILTIN_LABELS: u32 = 1;
-pub const END_OF_BUILTIN_LABELS: u32 = 20;
-pub const PRINT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS;
-pub const INPUT_PTR_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 1;
-pub const PRINT_VAL_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 2;
-pub const INPUT_VAL_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 3;
-pub const EXIT_LABEL: u32 = BEGIN_OF_BUILTIN_LABELS + 4;
+type LabelId = u32;
+type VariableId = u32;
+type NumLiteral = i32;
+
+pub const START_LABEL: LabelId = 0;
+pub const BEGIN_OF_BUILTIN_LABELS: LabelId = 1;
+pub const END_OF_BUILTIN_LABELS: LabelId = 20;
+pub const PRINT_PTR_LABEL: LabelId = BEGIN_OF_BUILTIN_LABELS;
+pub const INPUT_PTR_LABEL: LabelId = BEGIN_OF_BUILTIN_LABELS + 1;
+pub const PRINT_VAL_LABEL: LabelId = BEGIN_OF_BUILTIN_LABELS + 2;
+pub const INPUT_VAL_LABEL: LabelId = BEGIN_OF_BUILTIN_LABELS + 3;
+pub const EXIT_LABEL: LabelId = BEGIN_OF_BUILTIN_LABELS + 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
@@ -122,24 +126,22 @@ impl From<ast::BinaryOperator> for ComparisonOperator {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum Operand {
-    TempVariable { id: u32 },
-    // IndirectTemp { id: u32 },
-    Variable { id: u32 },
-    IndirectVariable { id: u32 },
+    Variable { id: VariableId },
+    IndirectVariable { id: VariableId },
 
-    NumberLiteral { value: i32 },
-    IndirectNumberLiteral { value: i32 },
+    NumberLiteral { value: NumLiteral },
+    IndirectNumberLiteral { value: NumLiteral },
 }
 
 impl Operand {
-    pub fn variable_id(&self) -> Option<u32> {
+    pub fn variable_id(&self) -> Option<VariableId> {
         match self {
             Operand::Variable { id } => Some(*id),
             _ => None,
         }
     }
 
-    pub fn number_literal_value(&self) -> Option<i32> {
+    pub fn number_literal_value(&self) -> Option<NumLiteral> {
         match self {
             Operand::NumberLiteral { value } => Some(*value),
             _ => None,
@@ -150,7 +152,6 @@ impl Operand {
 impl std::fmt::Display for Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Operand::TempVariable { id } => write!(f, "t{}", id),
             Operand::Variable { id } => write!(f, "v{}", id),
             Operand::NumberLiteral { value } => write!(f, "{}", value),
             Operand::IndirectVariable { id } => write!(f, "*v{}", id),
@@ -175,24 +176,24 @@ pub enum Tac {
     },
     // Control flow
     Goto {
-        label: u32,
+        label: LabelId,
     },
     Label {
-        id: u32,
+        label: LabelId,
     },
     Return,
     If {
         op: ComparisonOperator,
         left: Operand,
         right: Operand,
-        label: u32,
+        label: LabelId,
     },
     // Labels 0-100 are reserved for built-in functions
     ExternCall {
-        label: u32,
+        label: LabelId,
     },
     Call {
-        label: u32,
+        label: LabelId,
     },
     Param {
         operand: Operand,
@@ -201,7 +202,7 @@ pub enum Tac {
 
 impl std::fmt::Display for Tac {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn print_label(f: &mut std::fmt::Formatter<'_>, id: u32) -> std::fmt::Result {
+        fn print_label(f: &mut std::fmt::Formatter<'_>, id: LabelId) -> std::fmt::Result {
             match id {
                 START_LABEL => write!(f, "start"),
                 PRINT_PTR_LABEL => write!(f, "print_ptr"),
@@ -227,7 +228,7 @@ impl std::fmt::Display for Tac {
                 write!(f, "goto ")?;
                 print_label(f, *label)
             }
-            Tac::Label { id } => print_label(f, *id),
+            Tac::Label { label: id } => print_label(f, *id),
             Tac::Return => write!(f, "return"),
             Tac::If {
                 op,

@@ -123,8 +123,8 @@ impl BasicBlock {
                     }
                 }
 
-                Tac::Label { id } => {
-                    new_tacs.push(Tac::Label { id: *id });
+                Tac::Label { label: id } => {
+                    new_tacs.push(Tac::Label { label: *id });
                 }
                 Tac::Param { operand } => {
                     if let Some(val) = var_val.get(operand) {

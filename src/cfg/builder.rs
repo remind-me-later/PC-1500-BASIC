@@ -164,7 +164,7 @@ impl TacVisitor for Builder {
                 let upgraded = self.current_block.upgrade().unwrap();
                 let mut current_block = upgraded.borrow_mut();
 
-                current_block.push(Tac::Label { id });
+                current_block.push(Tac::Label { label: id });
 
                 self.label_to_block
                     .insert(id, Weak::clone(&self.current_block));

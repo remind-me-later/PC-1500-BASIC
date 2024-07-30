@@ -211,7 +211,7 @@ impl<'a> Lexer<'a> {
             return Err(());
         }
 
-        let string = &self.input[self.position..self.position + len - 1];
+        let string = &self.input[self.position + 1..self.position + len - 1];
         self.position += len;
         Ok(Token::String(string.to_string()))
     }

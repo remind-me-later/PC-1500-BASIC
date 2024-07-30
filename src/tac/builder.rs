@@ -21,7 +21,6 @@ pub struct Builder<'a> {
 
     program: &'a ast::Program,
 
-    var_map: HashMap<&'a str, Operand>,
     expr_map: HashMap<&'a ast::Expression, Operand>,
 
     str_map: HashMap<&'a str, usize>,
@@ -33,7 +32,6 @@ pub struct Builder<'a> {
     goto_list: Vec<usize>,
 
     next_variable: u32,
-    next_temp: u32,
     next_label: u32,
 }
 
@@ -42,7 +40,6 @@ impl<'a> Builder<'a> {
         Self {
             program,
             hir: Vec::new(),
-            var_map: HashMap::new(),
             expr_map: HashMap::new(),
             line_to_hir_map: HashMap::new(),
             for_stack: Vec::new(),
@@ -51,7 +48,6 @@ impl<'a> Builder<'a> {
             str_map: HashMap::new(),
             str_literals: Vec::new(),
             goto_list: Vec::new(),
-            next_temp: 0,
         }
     }
 
@@ -64,12 +60,6 @@ impl<'a> Builder<'a> {
     fn get_next_variable_id(&mut self) -> u32 {
         let id = self.next_variable;
         self.next_variable += 1;
-        id
-    }
-
-    fn get_next_temp_id(&mut self) -> u32 {
-        let id = self.next_temp;
-        self.next_temp += 1;
         id
     }
 
@@ -106,21 +96,15 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
     }
 
     fn visit_variable(&mut self, variable: &'a str) -> Operand {
-        if let Some(&id) = self.var_map.get(variable) {
-            id
+        let id = self.get_next_variable_id();
+
+        let var = if variable.trim().ends_with("$") {
+            Operand::IndirectVariable { id }
         } else {
-            let id = self.get_next_variable_id();
+            Operand::Variable { id }
+        };
 
-            let var = if variable.trim().ends_with("$") {
-                Operand::IndirectVariable { id }
-            } else {
-                Operand::Variable { id }
-            };
-
-            self.var_map.insert(variable, var);
-
-            var
-        }
+        var
     }
 
     fn visit_binary_op(
@@ -146,8 +130,8 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
         };
 
         // TODO: if string concatenation is allowed this has to change
-        let dest_op = Operand::TempVariable {
-            id: self.get_next_temp_id(),
+        let dest_op = Operand::Variable {
+            id: self.get_next_variable_id(),
         };
 
         self.hir.push(Tac::BinExpression {
@@ -177,9 +161,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             self.hir.push(Tac::Param { operand });
 
             match operand {
-                Operand::TempVariable { .. }
-                | Operand::Variable { .. }
-                | Operand::NumberLiteral { .. } => {
+                Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
                     self.hir.push(Tac::ExternCall {
                         label: PRINT_VAL_LABEL,
                     });
@@ -199,9 +181,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
             self.hir.push(Tac::Param { operand: prompt });
 
             match prompt {
-                Operand::TempVariable { .. }
-                | Operand::Variable { .. }
-                | Operand::NumberLiteral { .. } => {
+                Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
                     self.hir.push(Tac::ExternCall {
                         label: PRINT_VAL_LABEL,
                     });
@@ -218,9 +198,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         self.hir.push(Tac::Param { operand: dest });
 
         match dest {
-            Operand::TempVariable { .. }
-            | Operand::Variable { .. }
-            | Operand::NumberLiteral { .. } => {
+            Operand::Variable { .. } | Operand::NumberLiteral { .. } => {
                 self.hir.push(Tac::ExternCall {
                     label: INPUT_VAL_LABEL,
                 });
@@ -262,7 +240,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         };
 
         self.hir.push(Tac::Label {
-            id: info.begin_label,
+            label: info.begin_label,
         });
 
         self.hir.push(Tac::If {
@@ -300,7 +278,7 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         self.hir.push(Tac::Goto {
             label: info.begin_label,
         });
-        self.hir.push(Tac::Label { id: info.end_label });
+        self.hir.push(Tac::Label { label: info.end_label });
     }
 
     fn visit_end(&mut self) {
@@ -375,11 +353,11 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         if let Some(else_) = else_ {
             let else_label = self.get_next_label();
             self.hir.push(Tac::Goto { label: else_label });
-            self.hir.push(Tac::Label { id: label });
+            self.hir.push(Tac::Label { label });
             else_.accept(self);
-            self.hir.push(Tac::Label { id: else_label });
+            self.hir.push(Tac::Label { label: else_label });
         } else {
-            self.hir.push(Tac::Label { id: label });
+            self.hir.push(Tac::Label { label });
         }
     }
 
@@ -423,7 +401,7 @@ impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
                 let new_label_pos = *self.line_to_hir_map.get(&line).unwrap();
                 let new_label = self.get_next_label();
 
-                self.hir.insert(new_label_pos, Tac::Label { id: new_label });
+                self.hir.insert(new_label_pos, Tac::Label { label: new_label });
 
                 for j in i..self.goto_list.len() {
                     if self.goto_list[j] >= new_label_pos {
