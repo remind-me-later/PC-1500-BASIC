@@ -2,7 +2,7 @@ mod builder;
 mod visitor;
 
 pub use builder::Builder;
-pub use visitor::{OperandVisitor, ProgramVisitor, TacVisitor};
+pub use visitor::{ProgramVisitor, TacVisitor};
 
 use crate::ast;
 

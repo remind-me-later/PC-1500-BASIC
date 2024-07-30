@@ -208,37 +208,42 @@ impl BasicBlock {
 
 impl std::fmt::Display for BasicBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "=== {} ===", self.id)?;
-        for tac in &self.tacs {
-            match tac {
-                Tac::Label { .. } => {
-                    writeln!(f, "{}:", tac)?;
-                }
-                _ => {
-                    writeln!(f, "\t{}", tac)?;
-                }
-            }
+        let mut i = 0;
+
+        if self.tacs.is_empty() {
+            return Ok(());
+        } else if let Tac::Label { label } = self.tacs[0] {
+            writeln!(f, "╔═════ {} : l{} ═══", self.id, label)?;
+            i += 1;
+        } else {
+            writeln!(f, "╔═════ {} ═════════", self.id)?;
         }
 
-        write!(f, "==> ")?;
+        for tac in &self.tacs[i..] {
+            writeln!(f, "║\t{}", tac)?;
+        }
 
-        if let Some(next_to) = &self.next_to {
+        write!(f, "╚═════ ")?;
+
+        if let (Some(next_to), Some(branch_to)) = (&self.next_to, &self.branch_to) {
             let upgraded = next_to.upgrade().unwrap();
             let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
-            write!(f, "next: {} ", block.id)?;
-        }
+            write!(f, "{} | ", block.id)?;
 
-        if let Some(branch_to) = &self.branch_to {
             let upgraded = branch_to.upgrade().unwrap();
             let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
-            write!(f, "branch: {} ", block.id)?;
+            write!(f, "{} ════", block.id)?;
+        } else if let Some(next_to) = &self.next_to {
+            let upgraded = next_to.upgrade().unwrap();
+            let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
+            write!(f, "{} ═════════", block.id)?;
+        } else if let Some(branch_to) = &self.branch_to {
+            let upgraded = branch_to.upgrade().unwrap();
+            let block = <Rc<_> as Borrow<RefCell<_>>>::borrow(&upgraded).borrow();
+            write!(f, "{} ═════════", block.id)?;
+        } else {
+            write!(f, "end ════════")?;
         }
-
-        if self.next_to.is_none() && self.branch_to.is_none() {
-            write!(f, "end ")?;
-        }
-
-        write!(f, "<==")?;
 
         Ok(())
     }
