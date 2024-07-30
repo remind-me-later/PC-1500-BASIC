@@ -90,8 +90,15 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
     fn visit_string_literal(&mut self, content: &'a str) -> Operand {
         let index = self.insert_str_literal(content);
 
+        // TODO: horribly slow
+        let mut offset = 0;
+        for i in 0..index {
+            // +1 for the null terminator
+            offset += self.str_literals[i as usize].len() + 1;
+        }
+
         Operand::IndirectNumberLiteral {
-            value: index as i32,
+            value: offset as i32,
         }
     }
 
@@ -278,7 +285,9 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
         self.hir.push(Tac::Goto {
             label: info.begin_label,
         });
-        self.hir.push(Tac::Label { label: info.end_label });
+        self.hir.push(Tac::Label {
+            label: info.end_label,
+        });
     }
 
     fn visit_end(&mut self) {
@@ -401,7 +410,8 @@ impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
                 let new_label_pos = *self.line_to_hir_map.get(&line).unwrap();
                 let new_label = self.get_next_label();
 
-                self.hir.insert(new_label_pos, Tac::Label { label: new_label });
+                self.hir
+                    .insert(new_label_pos, Tac::Label { label: new_label });
 
                 for j in i..self.goto_list.len() {
                     if self.goto_list[j] >= new_label_pos {

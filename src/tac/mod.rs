@@ -205,24 +205,24 @@ impl std::fmt::Display for Tac {
         fn print_label(f: &mut std::fmt::Formatter<'_>, id: LabelId) -> std::fmt::Result {
             match id {
                 START_LABEL => write!(f, "start"),
-                PRINT_PTR_LABEL => write!(f, "print_ptr"),
-                INPUT_PTR_LABEL => write!(f, "input_ptr"),
-                PRINT_VAL_LABEL => write!(f, "print_val"),
-                INPUT_VAL_LABEL => write!(f, "input_val"),
+                PRINT_PTR_LABEL => write!(f, "print_str"),
+                INPUT_PTR_LABEL => write!(f, "input_str"),
+                PRINT_VAL_LABEL => write!(f, "print"),
+                INPUT_VAL_LABEL => write!(f, "input"),
                 EXIT_LABEL => write!(f, "exit"),
                 _ => write!(f, "l{}", id),
             }
         }
 
         match self {
-            Tac::Copy { src, dest } => write!(f, "{} := {}", dest, src),
+            Tac::Copy { src, dest } => write!(f, "{} = {}", dest, src),
             Tac::BinExpression {
                 left,
                 op,
                 right,
                 dest,
             } => {
-                write!(f, "{} := {} {} {}", dest, left, op, right)
+                write!(f, "{} = {} {} {}", dest, left, op, right)
             }
             Tac::Goto { label } => {
                 write!(f, "goto ")?;
@@ -240,7 +240,7 @@ impl std::fmt::Display for Tac {
                 print_label(f, *label)
             }
             Tac::ExternCall { label } => {
-                write!(f, "extern_call ")?;
+                write!(f, "call? ")?;
                 print_label(f, *label)
             }
             Tac::Call { label } => {
