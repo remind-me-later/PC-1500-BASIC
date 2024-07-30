@@ -4,7 +4,6 @@ pub struct Lexer<'a> {
     input: &'a str,
     position: usize,
     current_line: usize,
-    current_token: Option<Token>,
 }
 
 impl<'a> Lexer<'a> {
@@ -13,28 +12,10 @@ impl<'a> Lexer<'a> {
             input,
             position: 0,
             current_line: 0,
-            current_token: None,
         }
     }
 
-    pub fn peek(&'a mut self) -> Option<&'a Token> {
-        if self.current_token.is_none() {
-            self.current_token = self.next_token();
-        }
-
-        self.current_token.as_ref()
-    }
-
-    pub fn advance(&mut self) {
-        self.current_token = self.next_token();
-    }
-
-    pub fn reset(&mut self) {
-        self.position = 0;
-        self.current_line = 0;
-    }
-
-    pub fn next_token(&mut self) -> Option<Token> {
+    fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
         if self.position >= self.input.len() {
@@ -77,24 +58,24 @@ impl<'a> Lexer<'a> {
                     Token::Diamond
                 } else if self.input.chars().nth(self.position + 1) == Some('=') {
                     self.position += 2;
-                    Token::Le
+                    Token::LessOrEqual
                 } else {
                     self.position += 1;
-                    Token::Lt
+                    Token::LessThan
                 }
             }
             Some('>') => {
                 if self.input.chars().nth(self.position + 1) == Some('=') {
                     self.position += 2;
-                    Token::Ge
+                    Token::GreaterOrEqual
                 } else {
                     self.position += 1;
-                    Token::Gt
+                    Token::GreaterThan
                 }
             }
             Some('=') => {
                 self.position += 1;
-                Token::Eq
+                Token::Equal
             }
             Some(';') => {
                 self.position += 1;
@@ -106,11 +87,11 @@ impl<'a> Lexer<'a> {
             }
             Some('(') => {
                 self.position += 1;
-                Token::LParen
+                Token::LeftParen
             }
             Some(')') => {
                 self.position += 1;
-                Token::RParen
+                Token::RightParen
             }
             Some('\n') => {
                 self.current_line += 1;
@@ -120,7 +101,7 @@ impl<'a> Lexer<'a> {
                 }
 
                 self.position += 1;
-                Token::Eol
+                Token::Newline
             }
             Some('\r') => {
                 self.current_line += 1;
@@ -130,7 +111,7 @@ impl<'a> Lexer<'a> {
                 }
 
                 self.position += 1;
-                Token::Eol
+                Token::Newline
             }
             _ => panic!(
                 "Unexpected character '{}' at line {}",
@@ -250,5 +231,13 @@ impl<'a> Lexer<'a> {
         self.position += len;
 
         Token::Rem(s.trim().to_string())
+    }
+}
+
+impl Iterator for Lexer<'_> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_token()
     }
 }

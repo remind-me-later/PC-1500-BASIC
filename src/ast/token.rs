@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     Identifier(String),
     Number(i32),
@@ -30,17 +30,17 @@ pub enum Token {
     Slash,
     And,
     Or,
-    Eq,
+    Equal,
     Diamond,
-    Gt,
-    Lt,
-    Ge,
-    Le,
+    GreaterThan,
+    LessThan,
+    GreaterOrEqual,
+    LessOrEqual,
     Semicolon,
     Colon,
-    LParen,
-    RParen,
-    Eol,
+    LeftParen,
+    RightParen,
+    Newline,
 }
 
 impl std::fmt::Display for Token {
@@ -72,18 +72,18 @@ impl std::fmt::Display for Token {
             Token::And => write!(f, "AND"),
             Token::Or => write!(f, "OR"),
             // Comparison operators
-            Token::Eq => write!(f, "="),
+            Token::Equal => write!(f, "="),
             Token::Diamond => write!(f, "<>"),
-            Token::Gt => write!(f, ">"),
-            Token::Lt => write!(f, "<"),
-            Token::Ge => write!(f, ">="),
-            Token::Le => write!(f, "<="),
+            Token::GreaterThan => write!(f, ">"),
+            Token::LessThan => write!(f, "<"),
+            Token::GreaterOrEqual => write!(f, ">="),
+            Token::LessOrEqual => write!(f, "<="),
             // Punctuation
             Token::Semicolon => write!(f, ";"),
             Token::Colon => write!(f, ":"),
-            Token::LParen => write!(f, "("),
-            Token::RParen => write!(f, ")"),
-            Token::Eol => write!(f, "EOL"),
+            Token::LeftParen => write!(f, "("),
+            Token::RightParen => write!(f, ")"),
+            Token::Newline => write!(f, "EOL"),
             // Other
             Token::Identifier(ident) => write!(f, "{}", ident),
             Token::Number(num) => write!(f, "{}", num),

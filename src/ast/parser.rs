@@ -17,29 +17,29 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Program {
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         self.parse_program()
     }
 
     fn parse_factor(&mut self) -> Option<Expression> {
         match mem::take(&mut self.current_token) {
             Some(Token::Number(n)) => {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
                 Some(Expression::NumberLiteral(n))
             }
             Some(Token::Identifier(v)) => {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
                 Some(Expression::Variable(v))
             }
             Some(Token::String(s)) => {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
                 Some(Expression::StringLiteral(s))
             }
-            Some(Token::LParen) => {
-                self.current_token = self.lexer.next_token();
+            Some(Token::LeftParen) => {
+                self.current_token = self.lexer.next();
                 let res = self.parse_expression();
-                if self.current_token == Some(Token::RParen) {
-                    self.current_token = self.lexer.next_token();
+                if self.current_token == Some(Token::RightParen) {
+                    self.current_token = self.lexer.next();
                 } else {
                     panic!("Expected closing parenthesis");
                 }
@@ -62,7 +62,7 @@ impl<'a> Parser<'a> {
                 _ => unreachable!(),
             };
 
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             let right = self.parse_factor();
             let right = if let Some(right) = right {
                 right
@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
                 _ => unreachable!(),
             };
 
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             let right = self.parse_mul_div();
             let right = if let Some(right) = right {
                 right
@@ -111,20 +111,20 @@ impl<'a> Parser<'a> {
     fn parse_comparison(&mut self) -> Option<Expression> {
         let mut left = self.parse_add_sub()?;
 
-        while let Some(Token::Eq) | Some(Token::Diamond) | Some(Token::Lt) | Some(Token::Le)
-        | Some(Token::Gt) | Some(Token::Ge) = self.current_token
+        while let Some(Token::Equal) | Some(Token::Diamond) | Some(Token::LessThan) | Some(Token::LessOrEqual)
+        | Some(Token::GreaterThan) | Some(Token::GreaterOrEqual) = self.current_token
         {
             let op = match self.current_token {
-                Some(Token::Eq) => BinaryOperator::Eq,
+                Some(Token::Equal) => BinaryOperator::Eq,
                 Some(Token::Diamond) => BinaryOperator::Ne,
-                Some(Token::Lt) => BinaryOperator::Lt,
-                Some(Token::Le) => BinaryOperator::Le,
-                Some(Token::Gt) => BinaryOperator::Gt,
-                Some(Token::Ge) => BinaryOperator::Ge,
+                Some(Token::LessThan) => BinaryOperator::Lt,
+                Some(Token::LessOrEqual) => BinaryOperator::Le,
+                Some(Token::GreaterThan) => BinaryOperator::Gt,
+                Some(Token::GreaterOrEqual) => BinaryOperator::Ge,
                 _ => unreachable!(),
             };
 
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             let right = self.parse_add_sub();
             let right = if let Some(right) = right {
                 right
@@ -146,7 +146,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_comparison()?;
 
         while self.current_token == Some(Token::And) {
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             let right = self.parse_comparison();
             let right = if let Some(right) = right {
                 right
@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_and()?;
 
         while self.current_token == Some(Token::Or) {
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             let right = self.parse_and();
             let right = if let Some(right) = right {
                 right
@@ -193,7 +193,7 @@ impl<'a> Parser<'a> {
     fn parse_let(&mut self) -> Option<Statement> {
         let variable = match mem::take(&mut self.current_token) {
             Some(Token::Let) => {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
 
                 let variable = match mem::take(&mut self.current_token) {
                     Some(Token::Identifier(v)) => v,
@@ -210,12 +210,12 @@ impl<'a> Parser<'a> {
             }
         };
 
-        self.current_token = self.lexer.next_token();
-        if self.current_token != Some(Token::Eq) {
+        self.current_token = self.lexer.next();
+        if self.current_token != Some(Token::Equal) {
             panic!("Expected = after variable name");
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let expression = self.parse_expression();
         let expression = if let Some(expression) = expression {
             expression
@@ -234,14 +234,14 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let mut content = Vec::new();
 
         while let Some(expr) = self.parse_expression() {
             content.push(expr);
 
             if self.current_token == Some(Token::Semicolon) {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
             } else {
                 break;
             }
@@ -255,11 +255,11 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let prompt = self.parse_expression();
 
         if self.current_token == Some(Token::Semicolon) {
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
         }
 
         let variable = match mem::take(&mut self.current_token) {
@@ -267,7 +267,7 @@ impl<'a> Parser<'a> {
             _ => panic!("Expected variable name after INPUT"),
         };
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
 
         Some(Statement::Input { prompt, variable })
     }
@@ -277,7 +277,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
             Some(Token::Number(n)) => match u32::try_from(*n) {
                 Ok(n) => n,
@@ -288,7 +288,7 @@ impl<'a> Parser<'a> {
             _ => panic!("Expected line number after GOTO"),
         };
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
 
         Some(Statement::Goto { line_number })
     }
@@ -298,7 +298,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
             Some(Token::Number(n)) => match u32::try_from(*n) {
                 Ok(n) => n,
@@ -309,7 +309,7 @@ impl<'a> Parser<'a> {
             _ => panic!("Expected line number after GOSUB"),
         };
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
 
         Some(Statement::GoSub { line_number })
     }
@@ -319,7 +319,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
 
         Some(Statement::Return)
     }
@@ -329,14 +329,14 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let condition = match self.parse_expression() {
             Some(expr) => expr,
             None => panic!("Expected expression after IF"),
         };
 
         if self.current_token == Some(Token::Then) {
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
         }
 
         let then = match self.parse_statement() {
@@ -345,7 +345,7 @@ impl<'a> Parser<'a> {
         };
 
         let else_ = if self.current_token == Some(Token::Else) {
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             match self.parse_statement() {
                 Some(stmt) => Some(Box::new(stmt)),
                 None => panic!("Expected statement after ELSE"),
@@ -366,18 +366,18 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let variable = match mem::take(&mut self.current_token) {
             Some(Token::Identifier(v)) => v,
             _ => panic!("Expected variable name after FOR"),
         };
 
-        self.current_token = self.lexer.next_token();
-        if self.current_token != Some(Token::Eq) {
+        self.current_token = self.lexer.next();
+        if self.current_token != Some(Token::Equal) {
             panic!("Expected = after variable name");
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let from = match self.parse_expression() {
             Some(expr) => expr,
             None => panic!("Expected expression after ="),
@@ -387,14 +387,14 @@ impl<'a> Parser<'a> {
             panic!("Expected TO after FROM");
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let to = match self.parse_expression() {
             Some(expr) => expr,
             None => panic!("Expected expression after TO"),
         };
 
         let step = if self.current_token == Some(Token::Step) {
-            self.current_token = self.lexer.next_token();
+            self.current_token = self.lexer.next();
             match self.parse_expression() {
                 Some(expr) => Some(expr),
                 None => panic!("Expected expression after STEP"),
@@ -416,13 +416,13 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let variable = match mem::take(&mut self.current_token) {
             Some(Token::Identifier(v)) => v,
             _ => panic!("Expected variable name after NEXT"),
         };
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
 
         Some(Statement::Next { variable })
     }
@@ -432,7 +432,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
 
         Some(Statement::End)
     }
@@ -458,7 +458,7 @@ impl<'a> Parser<'a> {
             statements.push(stmt);
 
             if self.current_token == Some(Token::Colon) {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
             } else {
                 break;
             }
@@ -474,7 +474,7 @@ impl<'a> Parser<'a> {
     fn parse_comment(&mut self) -> Option<Statement> {
         match mem::take(&mut self.current_token) {
             Some(Token::Rem(s)) => {
-                self.current_token = self.lexer.next_token();
+                self.current_token = self.lexer.next();
                 Some(Statement::Rem { content: s })
             }
             other => {
@@ -496,15 +496,15 @@ impl<'a> Parser<'a> {
             _ => return None,
         };
 
-        self.current_token = self.lexer.next_token();
+        self.current_token = self.lexer.next();
         let statement = match self.parse_statement() {
             Some(stmt) => stmt,
             None => panic!("Expected statement after line number"),
         };
 
         match self.current_token {
-            Some(Token::Eol) => {
-                self.current_token = self.lexer.next_token();
+            Some(Token::Newline) => {
+                self.current_token = self.lexer.next();
             }
             None => {}
             _ => panic!("Expected end of line, found {:?}", self.current_token),
