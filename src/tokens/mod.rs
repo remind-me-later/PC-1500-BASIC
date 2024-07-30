@@ -2,7 +2,11 @@ use core::panic;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
-    // Keywords
+    Identifier(String),
+    Number(i32),
+    String(String),
+
+    // --- Keywords ---
     Let,
     Goto,
     Gosub,
@@ -18,32 +22,26 @@ pub enum Token {
     // Intrinsics, might as well be keywords
     Print,
     Input,
-    // Comments
+    // Comments, kind of a keyword
     Rem(String),
-    // Operators
+
+    // --- Symbols ---
     Plus,
     Minus,
     Star,
     Slash,
     And,
     Or,
-    // Comparison operators
     Eq,
     Diamond,
     Gt,
     Lt,
     Ge,
     Le,
-    // Punctuation
     Semicolon,
     Colon,
     LParen,
     RParen,
-    // Other
-    Identifier(String),
-    Number(i32),
-    String(String),
-    // Misc
     Eol,
 }
 
@@ -67,7 +65,7 @@ impl std::fmt::Display for Token {
             Token::Print => write!(f, "PRINT"),
             Token::Input => write!(f, "INPUT"),
             // Comments
-            Token::Rem(content) => write!(f, "/*{}*/", content),
+            Token::Rem(content) => write!(f, "REM({})", content),
             // Operators
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
@@ -87,12 +85,11 @@ impl std::fmt::Display for Token {
             Token::Colon => write!(f, ":"),
             Token::LParen => write!(f, "("),
             Token::RParen => write!(f, ")"),
+            Token::Eol => write!(f, "EOL"),
             // Other
             Token::Identifier(ident) => write!(f, "{}", ident),
             Token::Number(num) => write!(f, "{}", num),
             Token::String(string) => write!(f, "\"{}\"", string),
-            // Misc
-            Token::Eol => write!(f, "EOL"),
         }
     }
 }
@@ -100,11 +97,21 @@ impl std::fmt::Display for Token {
 pub struct Lexer<'a> {
     input: &'a str,
     position: usize,
+    current_line: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        Self { input, position: 0 }
+        Self {
+            input,
+            position: 0,
+            current_line: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.position = 0;
+        self.current_line = 0;
     }
 
     pub fn next_token(&mut self) -> Option<Token> {
@@ -114,119 +121,202 @@ impl<'a> Lexer<'a> {
             return None;
         }
 
-        let token = self
-            .read_comment()
-            .or_else(|| self.read_keyword())
-            .or_else(|| self.read_number())
-            .or_else(|| self.read_string())
-            .or_else(|| self.read_identifier())
-            .or_else(|| self.lex_operator())
-            .or_else(|| self.lex_punctuation())
-            .or_else(|| self.lex_misc());
+        let token = match self.input.chars().nth(self.position) {
+            Some(c) if c.is_ascii_alphabetic() => self.identifier(),
+            Some(c) if c.is_ascii_digit() => {
+                if let Some(token) = self.number().ok() {
+                    token
+                } else {
+                    panic!("Invalid number at line {}", self.current_line)
+                }
+            }
+            Some('"') => {
+                self.position += 1;
+                self.string()
+                    .unwrap_or_else(|_| panic!("Unterminated string at line {}", self.current_line))
+            }
+            Some('+') => {
+                self.position += 1;
+                Token::Plus
+            }
+            Some('-') => {
+                self.position += 1;
+                Token::Minus
+            }
+            Some('*') => {
+                self.position += 1;
+                Token::Star
+            }
+            Some('/') => {
+                self.position += 1;
+                Token::Slash
+            }
+            Some('<') => {
+                if self.input.chars().nth(self.position + 1) == Some('>') {
+                    self.position += 2;
+                    Token::Diamond
+                } else if self.input.chars().nth(self.position + 1) == Some('=') {
+                    self.position += 2;
+                    Token::Le
+                } else {
+                    self.position += 1;
+                    Token::Lt
+                }
+            }
+            Some('>') => {
+                if self.input.chars().nth(self.position + 1) == Some('=') {
+                    self.position += 2;
+                    Token::Ge
+                } else {
+                    self.position += 1;
+                    Token::Gt
+                }
+            }
+            Some('=') => {
+                self.position += 1;
+                Token::Eq
+            }
+            Some(';') => {
+                self.position += 1;
+                Token::Semicolon
+            }
+            Some(':') => {
+                self.position += 1;
+                Token::Colon
+            }
+            Some('(') => {
+                self.position += 1;
+                Token::LParen
+            }
+            Some(')') => {
+                self.position += 1;
+                Token::RParen
+            }
+            Some('\n') => {
+                self.current_line += 1;
 
-        if token.is_none() {
-            panic!(
-                "Unexpected character: {}",
-                self.input.chars().nth(self.position).unwrap()
-            );
-        }
+                if let Some('\r') = self.input.chars().nth(self.position + 1) {
+                    self.position += 1;
+                }
 
-        token
+                self.position += 1;
+                Token::Eol
+            }
+            Some('\r') => {
+                self.current_line += 1;
+
+                if let Some('\n') = self.input.chars().nth(self.position + 1) {
+                    self.position += 1;
+                }
+
+                self.position += 1;
+                Token::Eol
+            }
+            _ => panic!(
+                "Unexpected character '{}' at line {}",
+                self.input.chars().nth(self.position).unwrap(),
+                self.current_line
+            ),
+        };
+
+        Some(token)
     }
 
     fn skip_whitespace(&mut self) {
         while self.position < self.input.len() {
             match self.input.chars().nth(self.position) {
-                Some(' ') | Some('\t') => self.position += 1,
+                Some(' ' | '\t') => self.position += 1,
                 _ => break,
             }
         }
     }
 
-    fn read_identifier(&mut self) -> Option<Token> {
+    fn identifier(&mut self) -> Token {
         let mut len = 0;
-        let mut chars = self.input[self.position..].chars();
 
-        for char in chars.by_ref() {
+        for char in self.input[self.position..].chars() {
             if char.is_ascii_alphabetic() {
                 len += 1;
+            } else if char == '$' {
+                len += 1;
+                break;
             } else {
                 break;
             }
         }
 
-        if chars.by_ref().next() == Some('$') {
-            len += 1;
-        }
+        let ident = &self.input[self.position..self.position + len];
+        self.position += len;
 
-        if len > 0 {
-            let ident = &self.input[self.position..self.position + len];
-            self.position += len;
-            Some(Token::Identifier(ident.to_string()))
-        } else {
-            None
-        }
+        let token = match ident {
+            "LET" => Token::Let,
+            "GOTO" => Token::Goto,
+            "GOSUB" => Token::Gosub,
+            "RETURN" => Token::Return,
+            "IF" => Token::If,
+            "ELSE" => Token::Else,
+            "THEN" => Token::Then,
+            "END" => Token::End,
+            "FOR" => Token::For,
+            "TO" => Token::To,
+            "STEP" => Token::Step,
+            "NEXT" => Token::Next,
+            "PRINT" => Token::Print,
+            "INPUT" => Token::Input,
+            "AND" => Token::And,
+            "OR" => Token::Or,
+            "REM" => self.comment(),
+            _ => Token::Identifier(ident.to_string()),
+        };
+
+        token
     }
 
-    fn read_number(&mut self) -> Option<Token> {
+    fn number(&mut self) -> Result<Token, ()> {
         let mut len = 0;
         let mut chars = self.input[self.position..].chars();
 
         for char in chars.by_ref() {
-            if char.is_numeric() {
+            if char.is_ascii_digit() {
                 len += 1;
             } else {
                 break;
             }
         }
 
-        if len > 0 {
-            let num = &self.input[self.position..self.position + len];
-            self.position += len;
-            Some(Token::Number(num.parse().unwrap()))
-        } else {
-            None
-        }
+        let num = &self.input[self.position..self.position + len];
+        self.position += len;
+
+        Ok(Token::Number(num.parse().map_err(|_| ())?))
     }
 
-    fn read_string(&mut self) -> Option<Token> {
+    fn string(&mut self) -> Result<Token, ()> {
         let mut len = 0;
+        let mut found_end = false;
         let mut chars = self.input[self.position..].chars();
-
-        if chars.next() == Some('"') {
-            len += 1;
-        } else {
-            return None;
-        }
 
         for char in chars.by_ref() {
             if char == '"' {
                 len += 1;
+                found_end = true;
                 break;
             } else {
                 len += 1;
             }
         }
 
-        if len > 0 {
-            let string = &self.input[self.position + 1..self.position + len - 1];
-            self.position += len;
-            Some(Token::String(string.to_string()))
-        } else {
-            None
+        if !found_end {
+            return Err(());
         }
+
+        let string = &self.input[self.position..self.position + len - 1];
+        self.position += len;
+        Ok(Token::String(string.to_string()))
     }
 
-    fn read_comment(&mut self) -> Option<Token> {
+    fn comment(&mut self) -> Token {
         let mut len = 0;
-
-        if self.input[self.position..].starts_with("REM") {
-            len += 3;
-        } else {
-            return None;
-        }
-
-        let mut chars = self.input[self.position + len..].chars();
+        let mut chars = self.input[self.position..].chars();
 
         for char in chars.by_ref() {
             if char == '\n' {
@@ -236,130 +326,9 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let s = &self.input[self.position + 3..self.position + len];
+        let s = &self.input[self.position..self.position + len];
         self.position += len;
 
-        let s = s.trim();
-
-        let s = s.to_string();
-
-        Some(Token::Rem(s))
-    }
-
-    fn read_keyword(&mut self) -> Option<Token> {
-        let mut len = 0;
-
-        let keyword = if self.input[self.position..].starts_with("LET") {
-            len += 3;
-            Token::Let
-        } else if self.input[self.position..].starts_with("GOTO") {
-            len += 4;
-            Token::Goto
-        } else if self.input[self.position..].starts_with("GOSUB") {
-            len += 5;
-            Token::Gosub
-        } else if self.input[self.position..].starts_with("RETURN") {
-            len += 6;
-            Token::Return
-        } else if self.input[self.position..].starts_with("IF") {
-            len += 2;
-            Token::If
-        } else if self.input[self.position..].starts_with("ELSE") {
-            len += 4;
-            Token::Else
-        } else if self.input[self.position..].starts_with("THEN") {
-            len += 4;
-            Token::Then
-        } else if self.input[self.position..].starts_with("END") {
-            len += 3;
-            Token::End
-        } else if self.input[self.position..].starts_with("FOR") {
-            len += 3;
-            Token::For
-        } else if self.input[self.position..].starts_with("TO") {
-            len += 2;
-            Token::To
-        } else if self.input[self.position..].starts_with("STEP") {
-            len += 4;
-            Token::Step
-        } else if self.input[self.position..].starts_with("NEXT") {
-            len += 4;
-            Token::Next
-        } else if self.input[self.position..].starts_with("PRINT") {
-            len += 5;
-            Token::Print
-        } else if self.input[self.position..].starts_with("INPUT") {
-            len += 5;
-            Token::Input
-        } else {
-            return None;
-        };
-
-        self.position += len;
-        Some(keyword)
-    }
-
-    fn lex_operator(&mut self) -> Option<Token> {
-        if self.input[self.position..].starts_with("AND") {
-            self.position += 3;
-            return Some(Token::And);
-        } else if self.input[self.position..].starts_with("OR") {
-            self.position += 2;
-            return Some(Token::Or);
-        }
-
-        let operator = match self.input.chars().nth(self.position) {
-            Some('+') => Token::Plus,
-            Some('-') => Token::Minus,
-            Some('*') => Token::Star,
-            Some('/') => Token::Slash,
-            Some('<') => {
-                if self.input.chars().nth(self.position + 1) == Some('>') {
-                    self.position += 1;
-                    Token::Diamond
-                } else if self.input.chars().nth(self.position + 1) == Some('=') {
-                    self.position += 1;
-                    Token::Le
-                } else {
-                    Token::Lt
-                }
-            }
-            Some('>') => {
-                if self.input.chars().nth(self.position + 1) == Some('=') {
-                    self.position += 1;
-                    Token::Ge
-                } else {
-                    Token::Gt
-                }
-            }
-            Some('=') => Token::Eq,
-            _ => return None,
-        };
-
-        self.position += 1;
-        Some(operator)
-    }
-
-    fn lex_punctuation(&mut self) -> Option<Token> {
-        let punctuation = match self.input.chars().nth(self.position) {
-            Some(';') => Token::Semicolon,
-            Some(':') => Token::Colon,
-            Some('(') => Token::LParen,
-            Some(')') => Token::RParen,
-            _ => return None,
-        };
-
-        self.position += 1;
-        Some(punctuation)
-    }
-
-    fn lex_misc(&mut self) -> Option<Token> {
-        let token = match self.input.chars().nth(self.position) {
-            Some('\n') => Token::Eol,
-            _ => return None,
-        };
-
-        self.position += 1;
-        Some(token)
+        Token::Rem(s.trim().to_string())
     }
 }

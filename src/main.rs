@@ -9,12 +9,14 @@ fn main() {
     // Read file from first argument
     let input = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
 
-    let tokens = tokens::Lexer::new(&input);
+    let mut tokens = tokens::Lexer::new(&input);
 
-    // while let Some(token) = tokens.next_token() {
-    //     print!("{} ", token);
-    // }
-    // println!();
+    println!("Tokens: ");
+    while let Some(token) = tokens.next_token() {
+        print!("{} ", token);
+    }
+    println!();
+    tokens.reset();
 
     let mut parser = ast::Parser::new(tokens);
 
