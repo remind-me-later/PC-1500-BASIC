@@ -134,7 +134,7 @@ impl<'a> Lexer<'a> {
     fn identifier(&mut self) -> Token {
         let mut len = 1;
 
-        for &char in self.input[self.position + 1..].as_bytes() {
+        for &char in self.input.get(self.position + 1..).unwrap().as_bytes() {
             if char.is_ascii_alphabetic() {
                 len += 1;
             } else if char == b'$' {
@@ -145,10 +145,10 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let ident = &self.input[self.position..self.position + len];
+        let ident = self.input.get(self.position..self.position + len).unwrap();
         self.position += len;
 
-        let token = match ident {
+        match ident {
             "LET" => Token::Let,
             "GOTO" => Token::Goto,
             "GOSUB" => Token::Gosub,
@@ -166,10 +166,8 @@ impl<'a> Lexer<'a> {
             "AND" => Token::And,
             "OR" => Token::Or,
             "REM" => self.comment(),
-            _ => Token::Identifier(ident.to_string()),
-        };
-
-        token
+            _ => Token::Identifier(ident.to_owned()),
+        }
     }
 
     // We already know the first character is a digit before entering this function
@@ -185,10 +183,10 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let num = &self.input[self.position..self.position + len];
+        let num = self.input.get(self.position..self.position + len).unwrap();
         self.position += len;
 
-        Ok(Token::Number(num.parse().map_err(|_| ())?))
+        Ok(Token::Number(num.parse().map_err(|_e| ())?))
     }
 
     // We already know the first character is a double quote before entering this function
@@ -211,9 +209,12 @@ impl<'a> Lexer<'a> {
             return Err(());
         }
 
-        let string = &self.input[self.position + 1..self.position + len - 1];
+        let string = self
+            .input
+            .get(self.position + 1..self.position + len - 1)
+            .unwrap();
         self.position += len;
-        Ok(Token::String(string.to_string()))
+        Ok(Token::String(string.to_owned()))
     }
 
     fn comment(&mut self) -> Token {
@@ -228,10 +229,10 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let s = &self.input[self.position..self.position + len];
+        let s = self.input.get(self.position..self.position + len).unwrap();
         self.position += len;
 
-        Token::Rem(s.trim().to_string())
+        Token::Rem(s.trim().to_owned())
     }
 }
 
@@ -243,7 +244,7 @@ impl Iterator for Lexer<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.input[self.position..].len()))
+        (0, Some(self.input.get(self.position..).unwrap().len()))
     }
 }
 

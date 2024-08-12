@@ -75,7 +75,7 @@ impl<'a> Builder<'a> {
             id as u32
         } else {
             let id = self.str_literals.len();
-            self.str_literals.push(s.to_string());
+            self.str_literals.push(s.to_owned());
             self.str_map.insert(s, id);
             id as u32
         }
@@ -105,13 +105,11 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
     fn visit_variable(&mut self, variable: &'a str) -> Operand {
         let id = self.get_next_variable_id();
 
-        let var = if variable.trim().ends_with("$") {
+        if variable.trim().ends_with("$") {
             Operand::IndirectVariable { id }
         } else {
             Operand::Variable { id }
-        };
-
-        var
+        }
     }
 
     fn visit_binary_op(
@@ -398,7 +396,7 @@ impl<'a> ast::ProgramVisitor<'a> for Builder<'a> {
             let new_label = {
                 let line = match &self.hir[goto_idx] {
                     Tac::Goto { label: line } | Tac::Call { label: line } => *line as usize,
-                    Tac::ExternCall { label: _ } => {
+                    Tac::ExternCall { .. } => {
                         // IGNORE EXTERN CALLS
                         i += 1;
                         continue;

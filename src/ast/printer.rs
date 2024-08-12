@@ -118,7 +118,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         self.indent -= 1;
 
         // TODO: should be ok
-        if self.output.chars().last() == Some('\t') {
+        if self.output.ends_with('\t') {
             self.output.pop();
         }
 

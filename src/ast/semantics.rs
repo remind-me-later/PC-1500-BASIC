@@ -87,7 +87,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
             | BinaryOperator::Or => {
                 if left_ty != Ty::Int {
                     self.errors
-                        .push("Arithmetic operands must be integers".to_string());
+                        .push("Arithmetic operands must be integers".to_owned());
                 }
             }
             BinaryOperator::Eq
@@ -150,20 +150,20 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
 
         if var_ty != Ty::Int {
             self.errors
-                .push("Loop variable must be an integer".to_string());
+                .push("Loop variable must be an integer".to_owned());
         }
 
         let from_ty = from.accept(self);
         let to_ty = to.accept(self);
 
         if from_ty != Ty::Int || to_ty != Ty::Int {
-            self.errors.push("Loop bounds must be integers".to_string());
+            self.errors.push("Loop bounds must be integers".to_owned());
         }
 
         if let Some(step) = step {
             let step_ty = step.accept(self);
             if step_ty != Ty::Int {
-                self.errors.push("Loop step must be an integer".to_string());
+                self.errors.push("Loop step must be an integer".to_owned());
             }
         }
 
@@ -174,20 +174,20 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         let var_ty = self.get_ty(variable);
         if var_ty != Ty::Int {
             self.errors
-                .push("Loop variable must be an integer".to_string());
+                .push("Loop variable must be an integer".to_owned());
         }
 
         if let Some(last) = self.for_stack.pop() {
             if last != variable {
                 self.errors.push(
-                    "NEXT variable: ".to_string()
+                    "NEXT variable: ".to_owned()
                         + variable
                         + " does not match FOR variable: "
                         + last,
                 );
             }
         } else {
-            self.errors.push("NEXT without matching FOR".to_string());
+            self.errors.push("NEXT without matching FOR".to_owned());
         }
     }
 
@@ -211,7 +211,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     ) {
         let condition_ty = condition.accept(self);
         if condition_ty != Ty::Int {
-            self.errors.push("Condition must be an integer".to_string());
+            self.errors.push("Condition must be an integer".to_owned());
         }
 
         then.accept(self);

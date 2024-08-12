@@ -3,9 +3,9 @@ mod ast;
 mod cfg;
 mod tac;
 
-use std::{fs::File, io::Read};
+use std::fs;
 
-use clap::{builder::PossibleValuesParser, Arg, Command};
+use clap::{Arg, Command};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pass {
@@ -14,6 +14,22 @@ enum Pass {
     Sem,
     Tac,
     Cfg,
+}
+
+impl clap::ValueEnum for Pass {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Pass::Lex, Pass::Parse, Pass::Sem, Pass::Tac, Pass::Cfg]
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        match self {
+            Pass::Lex => Some(clap::builder::PossibleValue::new("lex")),
+            Pass::Parse => Some(clap::builder::PossibleValue::new("parse")),
+            Pass::Sem => Some(clap::builder::PossibleValue::new("sem")),
+            Pass::Tac => Some(clap::builder::PossibleValue::new("tac")),
+            Pass::Cfg => Some(clap::builder::PossibleValue::new("cfg")),
+        }
+    }
 }
 
 // TODO: use clap for argument parsing
@@ -40,9 +56,7 @@ fn main() {
                 .long("pass")
                 .value_name("PASS")
                 .help("Compiler pass to run")
-                .value_parser(PossibleValuesParser::new(&[
-                    "lex", "parse", "sem", "tac", "cfg",
-                ]))
+                .value_parser(clap::builder::EnumValueParser::<Pass>::new())
                 // TODO: change when the compiler is finished
                 .default_value("parse")
                 .required(false),
@@ -50,27 +64,15 @@ fn main() {
         .get_matches();
 
     // Read file from first argument
-    let input = {
-        let mut file = File::open(args.get_one::<String>("input").unwrap()).unwrap();
-        let mut input = String::new();
-        file.read_to_string(&mut input).unwrap();
-        input
-    };
+    let input = fs::read_to_string(args.get_one::<String>("input").unwrap()).unwrap();
 
-    let pass = match args.get_one::<String>("pass").unwrap().as_str() {
-        "lex" => Pass::Lex,
-        "parse" => Pass::Parse,
-        "sem" => Pass::Sem,
-        "tac" => Pass::Tac,
-        "cfg" => Pass::Cfg,
-        _ => unreachable!(),
-    };
+    let pass = *args.get_one::<Pass>("pass").unwrap();
 
     let tokens = ast::Lexer::new(&input);
 
     if pass == Pass::Lex {
         for token in tokens {
-            println!("{:?}", token);
+            println!("{}", token);
         }
 
         return;
@@ -78,11 +80,11 @@ fn main() {
 
     let mut parser = ast::Parser::new(tokens);
 
-    let (program, errors) = parser.parse();
+    let (program, parse_errors) = parser.parse();
 
-    if !errors.is_empty() {
+    if !parse_errors.is_empty() {
         println!("Errors parsing program:");
-        for error in errors {
+        for error in parse_errors {
             println!("{}", error);
         }
     } else {
@@ -94,9 +96,9 @@ fn main() {
         }
 
         let sem_checker = ast::SemanticChecker::new(&program);
-        let errors = sem_checker.check();
+        let sem_errors = sem_checker.check();
 
-        match errors {
+        match sem_errors {
             Ok(_) => {
                 if pass == Pass::Sem {
                     println!("No semantic errors found");
@@ -115,7 +117,12 @@ fn main() {
         let (tac, literals) = tac::Builder::new(&program).build();
 
         if pass == Pass::Tac {
-            println!("string literals: {:?}\n", literals);
+            print!("string literals: ");
+            for literal in literals {
+                print!("{} ", literal);
+            }
+            println!();
+
             println!("start:\n{}", tac);
             return;
         }

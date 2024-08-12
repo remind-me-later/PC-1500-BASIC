@@ -238,7 +238,7 @@ impl<'a> Parser<'a> {
             Some(Token::Let) => {
                 self.current_token = self.lexer.next();
 
-                let variable = match mem::take(&mut self.current_token) {
+                match mem::take(&mut self.current_token) {
                     Some(Token::Identifier(v)) => v,
                     _ => {
                         return Err(Error {
@@ -246,9 +246,7 @@ impl<'a> Parser<'a> {
                             line: self.lexer.current_line(),
                         });
                     }
-                };
-
-                variable
+                }
             }
             Some(Token::Identifier(v)) => v,
             _ => {
@@ -604,7 +602,7 @@ impl<'a> Parser<'a> {
 
         self.current_token = self.lexer.next();
 
-        while self.current_token != None {
+        while self.current_token.is_some() {
             match self.parse_line() {
                 Ok((line_number, statement)) => {
                     program.add_line(line_number, statement);
