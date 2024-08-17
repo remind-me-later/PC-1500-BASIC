@@ -5,7 +5,7 @@
 Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 
 ```ebnf
-/* Tokens */
+/* --- Tokens --- */
 <digit> ::= [0-9]
 <number> ::= <digit>+
 <letter> ::= [A-Z]
@@ -14,13 +14,46 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <add_sub_op> ::= "+" | "-"
 <mul_div_op> ::= "*" | "/"
 <char> ::= [A-Z] | [a-z] | [0-9] | " " | "!" | "\"" | "#" | "$" | "%" | "&" | "'" | "(" | ")" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "\\" | "]" | "^" | "_" | "`" | "{" | "|" | "}" | "~"
+<string> ::= "\"" <char>* "\"" | "\"" <char>*
+<newline> ::= "\n"
 
-/* Grammar */
+/* --- Grammar --- */
 <program> ::= <line> | <line> <program>
-<line> ::= <number> <statement>
-<statement> ::= <assignment> 
+<line> ::= <number> <statement> <newline>
+
+/* Statements */
+<statement> ::= <atomic_statement> (":" <atomic_statement>)*
+<atomic_statement> ::= <assignment> 
+    | <print>
+    | <input>
+    | <if>
+    | <for>
+    | <next>
+    | <goto>
+    | <gosub>
+    | <return>
+    | <end>
+    | <comment>
+
+<comment> ::= "REM" <char>*
+
 <assignment> ::= "LET"? <variable> "=" <expression>
 <variable> ::= <identifier> "$"?
+
+/* I/O */
+<print> ::= "PRINT" <expression> (";" <expression>)*
+<input> ::= "INPUT" (<expression> ";")? <variable>
+
+/* Control flow */
+<if> ::= "IF" <expression> "THEN" <statement> ("ELSE" <statement>)?
+<for> ::= "FOR" <variable> "=" <expression> "TO" <expression> ("STEP" <expression>)?
+<next> ::= "NEXT" <variable>
+<goto> ::= "GOTO" <number>
+<gosub> ::= "GOSUB" <number>
+<return> ::= "RETURN"
+<end> ::= "END"
+
+/* Expressions */
 <expression> ::= <or_expr>
 <or_expr> ::= <and_expr> ("OR" <and_expr>)*
 <and_expr> ::= <not_expr> ("AND" <not_expr>)*
@@ -30,5 +63,4 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <mul_div> ::= <factor> (<mul_div_op> <factor>)*
 <factor> ::= "-" <factor> | "+" <factor> | <term>
 <term> ::= <number> | <variable> | <string> | "(" <expression> ")"
-<string> ::= "\"" <char>* "\"" | "\"" <char>*
 ```

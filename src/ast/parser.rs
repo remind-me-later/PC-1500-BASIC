@@ -19,7 +19,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> (Program, Vec<Error>) {
-        self.parse_program()
+        self.program()
     }
 
     fn term(&mut self) -> Result<Option<Expression>, Error> {
@@ -38,7 +38,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::LeftParen) => {
                 self.current_token = self.lexer.next();
-                let res = self.parse_expression()?;
+                let res = self.expression()?;
                 if self.current_token == Some(Token::RightParen) {
                     self.current_token = self.lexer.next();
                     Ok(res)
@@ -280,11 +280,11 @@ impl<'a> Parser<'a> {
         Ok(Some(left))
     }
 
-    fn parse_expression(&mut self) -> Result<Option<Expression>, Error> {
+    fn expression(&mut self) -> Result<Option<Expression>, Error> {
         self.or()
     }
 
-    fn parse_let(&mut self) -> Result<Statement, Error> {
+    fn let_(&mut self) -> Result<Statement, Error> {
         let variable = match mem::take(&mut self.current_token) {
             // Optional LET keyword
             Some(Token::Let) => {
@@ -315,7 +315,7 @@ impl<'a> Parser<'a> {
         }
 
         self.current_token = self.lexer.next();
-        let expression = self.parse_expression();
+        let expression = self.expression();
         let expression = if let Some(expression) = expression? {
             expression
         } else {
@@ -331,11 +331,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_print(&mut self) -> Result<Statement, Error> {
+    fn print(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let mut content = Vec::new();
 
-        while let Some(expr) = self.parse_expression()? {
+        while let Some(expr) = self.expression()? {
             content.push(expr);
 
             if self.current_token == Some(Token::Semicolon) {
@@ -348,9 +348,9 @@ impl<'a> Parser<'a> {
         Ok(Statement::Print { content })
     }
 
-    fn parse_input(&mut self) -> Result<Statement, Error> {
+    fn input(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
-        let prompt = self.parse_expression()?;
+        let prompt = self.expression()?;
 
         if self.current_token == Some(Token::Semicolon) {
             self.current_token = self.lexer.next();
@@ -371,7 +371,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::Input { prompt, variable })
     }
 
-    fn parse_goto(&mut self) -> Result<Statement, Error> {
+    fn goto(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
             Some(Token::Number(n)) => match u32::try_from(*n) {
@@ -421,15 +421,15 @@ impl<'a> Parser<'a> {
         Ok(Statement::GoSub { line_number })
     }
 
-    fn parse_return(&mut self) -> Result<Statement, Error> {
+    fn return_(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
 
         Ok(Statement::Return)
     }
 
-    fn parse_if(&mut self) -> Result<Statement, Error> {
+    fn if_(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
-        let condition = match self.parse_expression()? {
+        let condition = match self.expression()? {
             Some(expr) => expr,
             None => {
                 return Err(Error {
@@ -459,7 +459,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_for(&mut self) -> Result<Statement, Error> {
+    fn for_(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let variable = match mem::take(&mut self.current_token) {
             Some(Token::Identifier(v)) => v,
@@ -480,7 +480,7 @@ impl<'a> Parser<'a> {
         }
 
         self.current_token = self.lexer.next();
-        let from = match self.parse_expression()? {
+        let from = match self.expression()? {
             Some(expr) => expr,
             None => {
                 return Err(Error {
@@ -498,7 +498,7 @@ impl<'a> Parser<'a> {
         }
 
         self.current_token = self.lexer.next();
-        let to = match self.parse_expression()? {
+        let to = match self.expression()? {
             Some(expr) => expr,
             None => {
                 return Err(Error {
@@ -510,7 +510,7 @@ impl<'a> Parser<'a> {
 
         let step = if self.current_token == Some(Token::Step) {
             self.current_token = self.lexer.next();
-            match self.parse_expression()? {
+            match self.expression()? {
                 Some(expr) => Some(expr),
                 None => {
                     return Err(Error {
@@ -531,7 +531,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_next(&mut self) -> Result<Statement, Error> {
+    fn next(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let variable = match mem::take(&mut self.current_token) {
             Some(Token::Identifier(v)) => v,
@@ -548,24 +548,36 @@ impl<'a> Parser<'a> {
         Ok(Statement::Next { variable })
     }
 
-    fn parse_end(&mut self) -> Result<Statement, Error> {
+    fn end(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
 
         Ok(Statement::End)
     }
 
-    fn parse_atomic_statement(&mut self) -> Result<Statement, Error> {
+    fn comment(&mut self) -> Result<Statement, Error> {
+        match mem::take(&mut self.current_token) {
+            Some(Token::Rem(s)) => {
+                self.current_token = self.lexer.next();
+                Ok(Statement::Rem { content: s })
+            }
+            _ => {
+                unreachable!("We already checked for REM");
+            }
+        }
+    }
+
+    fn atomic_statement(&mut self) -> Result<Statement, Error> {
         match self.current_token {
-            Some(Token::Let | Token::Identifier(_)) => self.parse_let(),
-            Some(Token::Print) => self.parse_print(),
-            Some(Token::Input) => self.parse_input(),
-            Some(Token::Goto) => self.parse_goto(),
-            Some(Token::For) => self.parse_for(),
-            Some(Token::Next) => self.parse_next(),
-            Some(Token::End) => self.parse_end(),
+            Some(Token::Let | Token::Identifier(_)) => self.let_(),
+            Some(Token::Print) => self.print(),
+            Some(Token::Input) => self.input(),
+            Some(Token::Goto) => self.goto(),
+            Some(Token::For) => self.for_(),
+            Some(Token::Next) => self.next(),
+            Some(Token::End) => self.end(),
             Some(Token::Gosub) => self.parse_gosub(),
-            Some(Token::If) => self.parse_if(),
-            Some(Token::Return) => self.parse_return(),
+            Some(Token::If) => self.if_(),
+            Some(Token::Return) => self.return_(),
             Some(Token::Rem(_)) => self.comment(),
             _ => Err(Error {
                 kind: ErrorKind::ExpectedStatement,
@@ -579,7 +591,7 @@ impl<'a> Parser<'a> {
         let mut statements = Vec::new();
 
         loop {
-            let stmt = self.parse_atomic_statement()?;
+            let stmt = self.atomic_statement()?;
 
             statements.push(stmt);
 
@@ -595,18 +607,6 @@ impl<'a> Parser<'a> {
         } else {
             Statement::Seq { statements }
         })
-    }
-
-    fn comment(&mut self) -> Result<Statement, Error> {
-        match mem::take(&mut self.current_token) {
-            Some(Token::Rem(s)) => {
-                self.current_token = self.lexer.next();
-                Ok(Statement::Rem { content: s })
-            }
-            _ => {
-                unreachable!("We already checked for REM");
-            }
-        }
     }
 
     fn line(&mut self) -> Result<(u32, Statement), Error> {
@@ -648,7 +648,7 @@ impl<'a> Parser<'a> {
         Ok((line_number, statement))
     }
 
-    fn parse_program(&mut self) -> (Program, Vec<Error>) {
+    fn program(&mut self) -> (Program, Vec<Error>) {
         let mut errors = Vec::new();
         let mut program = Program::new();
 

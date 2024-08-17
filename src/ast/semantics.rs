@@ -1,6 +1,6 @@
 use super::{
-    BinaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor, Statement,
-    StatementVisitor,
+    node::UnaryOperator, BinaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor,
+    Statement, StatementVisitor,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +59,26 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
     }
 
     fn visit_number_literal(&mut self, _: i32) -> Ty {
+        Ty::Int
+    }
+
+    fn visit_unary_op(&mut self, op: UnaryOperator, operand: &'a Expression) -> Ty {
+        let operand_ty = operand.accept(self);
+        match op {
+            UnaryOperator::Not => {
+                if operand_ty != Ty::Int {
+                    self.errors
+                        .push("NOT operand must be an integer".to_owned());
+                }
+            }
+            UnaryOperator::Plus | UnaryOperator::Minus => {
+                if operand_ty != Ty::Int {
+                    self.errors
+                        .push("Unary plus/minus operand must be an integer".to_owned());
+                }
+            }
+        }
+
         Ty::Int
     }
 

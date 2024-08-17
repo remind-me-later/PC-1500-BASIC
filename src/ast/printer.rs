@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use super::{Expression, ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor};
+use super::{
+    node::UnaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor, Statement,
+    StatementVisitor,
+};
 
 pub struct Printer<'a> {
     indent: usize,
@@ -38,6 +41,11 @@ impl<'a> ExpressionVisitor<'a> for Printer<'a> {
 
     fn visit_variable(&mut self, variable: &'a str) {
         self.output.push_str(variable);
+    }
+
+    fn visit_unary_op(&mut self, op: UnaryOperator, operand: &'a Expression) {
+        self.output.push_str(op.to_string().as_str());
+        operand.accept(self);
     }
 
     fn visit_binary_op(

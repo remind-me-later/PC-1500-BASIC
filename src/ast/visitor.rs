@@ -1,9 +1,10 @@
-use super::{BinaryOperator, Expression, Program, Statement};
+use super::{node::UnaryOperator, BinaryOperator, Expression, Program, Statement};
 
 pub trait ExpressionVisitor<'a, RetTy = ()> {
     fn visit_number_literal(&mut self, num: i32) -> RetTy;
     fn visit_string_literal(&mut self, content: &'a str) -> RetTy;
     fn visit_variable(&mut self, variable: &'a str) -> RetTy;
+    fn visit_unary_op(&mut self, op: UnaryOperator, operand: &'a Expression) -> RetTy;
     fn visit_binary_op(
         &mut self,
         left: &'a Expression,
@@ -18,6 +19,7 @@ impl<'a> Expression {
             Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
             Expression::StringLiteral(content) => visitor.visit_string_literal(content),
             Expression::Variable(variable) => visitor.visit_variable(variable),
+            Expression::Unary { op, operand } => visitor.visit_unary_op(*op, operand),
             Expression::Binary { left, op, right } => visitor.visit_binary_op(left, *op, right),
         }
     }
