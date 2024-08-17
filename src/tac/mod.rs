@@ -29,6 +29,7 @@ pub enum BinaryOperator {
     // Logical
     And,
     Or,
+    Cp, // Compare
 }
 
 impl std::fmt::Display for BinaryOperator {
@@ -42,6 +43,7 @@ impl std::fmt::Display for BinaryOperator {
             // Logical
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Or => write!(f, "||"),
+            BinaryOperator::Cp => write!(f, "=="),
         }
     }
 }

@@ -112,6 +112,37 @@ impl<'a> ast::ExpressionVisitor<'a, Operand> for Builder<'a> {
         }
     }
 
+    fn visit_unary_op(&mut self, op: ast::UnaryOperator, operand: &'a ast::Expression) -> Operand {
+        let operand = operand.accept(self);
+        let dest = Operand::Variable {
+            id: self.get_next_variable_id(),
+        };
+
+        match op {
+            ast::UnaryOperator::Not => {
+                self.hir.push(Tac::BinExpression {
+                    left: operand,
+                    op: BinaryOperator::Cp,
+                    right: Operand::NumberLiteral { value: 0 },
+                    dest,
+                });
+            }
+            ast::UnaryOperator::Minus => {
+                self.hir.push(Tac::BinExpression {
+                    left: Operand::NumberLiteral { value: 0 },
+                    op: BinaryOperator::Sub,
+                    right: operand,
+                    dest,
+                });
+            }
+            ast::UnaryOperator::Plus => {
+                self.hir.push(Tac::Copy { src: operand, dest });
+            }
+        }
+
+        dest
+    }
+
     fn visit_binary_op(
         &mut self,
         left: &'a ast::Expression,
@@ -336,6 +367,16 @@ impl<'a> ast::StatementVisitor<'a> for Builder<'a> {
                 Tac::If {
                     op: ComparisonOperator::Ne,
                     left: var,
+                    right: Operand::NumberLiteral { value: 0 },
+                    label,
+                }
+            }
+            ast::Expression::Unary { operand, .. } => {
+                let operand = operand.accept(self);
+
+                Tac::If {
+                    op: ComparisonOperator::Ne,
+                    left: operand,
                     right: Operand::NumberLiteral { value: 0 },
                     label,
                 }

@@ -79,6 +79,7 @@ impl BasicBlock {
                             crate::tac::BinaryOperator::Or => {
                                 (left_val != 0 || right_val != 0) as i32
                             }
+                            crate::tac::BinaryOperator::Cp => (left_val == right_val) as i32,
                         };
 
                         var_val.insert(*dest, result);

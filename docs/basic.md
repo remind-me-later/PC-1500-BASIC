@@ -18,7 +18,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <newline> ::= "\n"
 
 /* --- Grammar --- */
-<program> ::= <line> | <line> <program>
+<program> ::= <line>+
 <line> ::= <number> <statement> <newline>
 
 /* Statements */
