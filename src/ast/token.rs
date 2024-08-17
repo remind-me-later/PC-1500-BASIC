@@ -17,6 +17,10 @@ pub enum Token {
     To,
     Step,
     Next,
+    // kinda operator but treated as keyword
+    And,
+    Or,
+    Not,
     // Intrinsics, might as well be keywords
     Print,
     Input,
@@ -28,8 +32,6 @@ pub enum Token {
     Minus,
     Star,
     Slash,
-    And,
-    Or,
     Equal,
     Diamond,
     GreaterThan,
@@ -71,6 +73,7 @@ impl std::fmt::Display for Token {
             Token::Slash => write!(f, "/"),
             Token::And => write!(f, "AND"),
             Token::Or => write!(f, "OR"),
+            Token::Not => write!(f, "NOT"),
             // Comparison operators
             Token::Equal => write!(f, "="),
             Token::Diamond => write!(f, "<>"),

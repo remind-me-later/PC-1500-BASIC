@@ -41,11 +41,32 @@ impl std::fmt::Display for BinaryOperator {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UnaryOperator {
+    Plus,
+    Minus,
+    Not,
+}
+
+impl std::fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UnaryOperator::Plus => write!(f, "+"),
+            UnaryOperator::Minus => write!(f, "-"),
+            UnaryOperator::Not => write!(f, "NOT"),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Expression {
     NumberLiteral(i32),
     StringLiteral(String),
     Variable(String),
+    Unary {
+        op: UnaryOperator,
+        operand: Box<Expression>,
+    },
     Binary {
         left: Box<Expression>,
         op: BinaryOperator,
@@ -59,6 +80,7 @@ impl std::fmt::Display for Expression {
             Expression::StringLiteral(content) => write!(f, "\"{}\"", content),
             Expression::NumberLiteral(value) => write!(f, "{}", value),
             Expression::Variable(variable) => write!(f, "{}", variable),
+            Expression::Unary { op, operand } => write!(f, "{}{}", op, operand),
             Expression::Binary { left, op, right } => write!(f, "{} {} {}", left, op, right),
         }
     }

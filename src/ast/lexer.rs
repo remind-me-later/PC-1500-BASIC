@@ -165,6 +165,7 @@ impl<'a> Lexer<'a> {
             "INPUT" => Token::Input,
             "AND" => Token::And,
             "OR" => Token::Or,
+            "NOT" => Token::Not,
             "REM" => self.comment(),
             _ => Token::Identifier(ident.to_owned()),
         }

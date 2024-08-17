@@ -1,0 +1,34 @@
+# The BASIC programming language for the Sharp PC-1500/TRS-80 PC-2
+
+## EBNF
+
+Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
+
+```ebnf
+/* Tokens */
+<digit> ::= [0-9]
+<number> ::= <digit>+
+<letter> ::= [A-Z]
+<identifier> ::= <letter> (<letter> | <digit>)*
+<comparison_op> ::= "=" | "<>" | "<" | ">" | "<=" | ">="
+<add_sub_op> ::= "+" | "-"
+<mul_div_op> ::= "*" | "/"
+<char> ::= [A-Z] | [a-z] | [0-9] | " " | "!" | "\"" | "#" | "$" | "%" | "&" | "'" | "(" | ")" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "\\" | "]" | "^" | "_" | "`" | "{" | "|" | "}" | "~"
+
+/* Grammar */
+<program> ::= <line> | <line> <program>
+<line> ::= <number> <statement>
+<statement> ::= <assignment> 
+<assignment> ::= "LET"? <variable> "=" <expression>
+<variable> ::= <identifier> "$"?
+<expression> ::= <or_expr>
+<or_expr> ::= <and_expr> ("OR" <and_expr>)*
+<and_expr> ::= <not_expr> ("AND" <not_expr>)*
+<not_expr> ::= <comparison> | "NOT" <not_expr>
+<comparison> ::= <add_sub> (<comparison_op> <add_sub>)*
+<add_sub> ::= <mul_div> (<add_sub_op> <mul_div>)*
+<mul_div> ::= <factor> (<mul_div_op> <factor>)*
+<factor> ::= "-" <factor> | "+" <factor> | <term>
+<term> ::= <number> | <variable> | <string> | "(" <expression> ")"
+<string> ::= "\"" <char>* "\"" | "\"" <char>*
+```
