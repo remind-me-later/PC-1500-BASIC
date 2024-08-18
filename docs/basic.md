@@ -28,6 +28,9 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
     | <pause>
     | <input>
     | <wait>
+    | <cursor>
+    | <gcursor>
+    | <gprint>
     | <if>
     | <for>
     | <next>
@@ -57,6 +60,9 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <pause> ::= "PAUSE" <expression> (";" <expression>)*
 <input> ::= "INPUT" (<expression> ";")? <lvalue>
 <wait> ::= "WAIT" <expression>?
+<cursor> ::= "CURSOR" <expression>
+<gcursor> ::= "GCURSOR" <expression>
+<gprint> ::= "GPRINT" <expression> (";" <expression>)* | "GPRINT" <string>
 
 /* Data */
 <data_item> ::= <number> | <string>
