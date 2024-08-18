@@ -48,7 +48,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 
 /* Variables */
 <variable> ::= <identifier> "$"?
-<array_subscript> ::= <variable> "(" <expression> ")"
+<array_subscript> ::= <variable> "(" <expression> ("," <expression> )? ")"
 <lvalue> ::= <variable> | <array_subscript>
 <assignment> ::= "LET"? <lvalue> "=" <expression>
 
@@ -78,7 +78,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <call> ::= "CALL" <number>
 
 /* Arrays */
-<dim> ::= "DIM" <variable> "(" <number> ")" ("*" <number>)?
+<dim> ::= "DIM" <variable> "(" <number> ("," <expression> )? ")" ("*" <number>)?
 
 /* Expressions */
 <expression> ::= <or_expr>
