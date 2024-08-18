@@ -1,7 +1,7 @@
 use std::mem;
 
 use super::error::ErrorKind;
-use super::node::UnaryOperator;
+use super::node::{DataItem, UnaryOperator};
 use super::{BinaryOperator, Error, Expression, Program, Statement};
 use super::{Lexer, Token};
 
@@ -26,7 +26,7 @@ impl<'a> Parser<'a> {
         match mem::take(&mut self.current_token) {
             Some(Token::Number(n)) => {
                 self.current_token = self.lexer.next();
-                Ok(Some(Expression::NumberLiteral(n)))
+                Ok(Some(Expression::Number(n)))
             }
             Some(Token::Identifier(v)) => {
                 self.current_token = self.lexer.next();
@@ -395,6 +395,88 @@ impl<'a> Parser<'a> {
         Ok(Statement::Wait { time })
     }
 
+    fn data(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let mut values = Vec::new();
+
+        loop {
+            match mem::take(&mut self.current_token) {
+                Some(Token::Number(n)) => {
+                    values.push(DataItem::Number(n));
+                    self.current_token = self.lexer.next();
+                }
+                Some(Token::String(s)) => {
+                    values.push(DataItem::String(s));
+                    self.current_token = self.lexer.next();
+                }
+                _ => {
+                    return Err(Error {
+                        kind: ErrorKind::ExpectedDataItem,
+                        line: self.lexer.current_line(),
+                    });
+                }
+            }
+
+            if self.current_token == Some(Token::Comma) {
+                self.current_token = self.lexer.next();
+            } else {
+                break;
+            }
+        }
+
+        Ok(Statement::Data { values })
+    }
+
+    fn read(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let mut variables = Vec::new();
+
+        loop {
+            match mem::take(&mut self.current_token) {
+                Some(Token::Identifier(v)) => {
+                    variables.push(v);
+                    self.current_token = self.lexer.next();
+                }
+                _ => {
+                    return Err(Error {
+                        kind: ErrorKind::ExpectedIdentifier,
+                        line: self.lexer.current_line(),
+                    });
+                }
+            }
+
+            if self.current_token == Some(Token::Comma) {
+                self.current_token = self.lexer.next();
+            } else {
+                break;
+            }
+        }
+
+        Ok(Statement::Read { variables })
+    }
+
+    fn restore(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let line_number = match &self.current_token {
+            Some(Token::Number(n)) => match u32::try_from(*n) {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    return Err(Error {
+                        kind: ErrorKind::ExpectedUnsigned,
+                        line: self.lexer.current_line(),
+                    });
+                }
+            },
+            _ => None,
+        };
+
+        if line_number.is_some() {
+            self.current_token = self.lexer.next();
+        }
+
+        Ok(Statement::Restore { line_number })
+    }
+
     fn goto(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
@@ -604,6 +686,9 @@ impl<'a> Parser<'a> {
             Some(Token::Gosub) => self.parse_gosub(),
             Some(Token::If) => self.if_(),
             Some(Token::Return) => self.return_(),
+            Some(Token::Data) => self.data(),
+            Some(Token::Read) => self.read(),
+            Some(Token::Restore) => self.restore(),
             Some(Token::Rem(_)) => self.comment(),
             _ => Err(Error {
                 kind: ErrorKind::ExpectedStatement,

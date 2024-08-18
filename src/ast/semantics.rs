@@ -257,6 +257,34 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     }
 
     fn visit_rem(&mut self, _: &'a str) {}
+
+    fn visit_read(&mut self, _variables: &'a [String]) -> () {
+        // TODO: is it possible to check types of read variables? Probably not
+    }
+
+    fn visit_data(&mut self, _values: &'a [super::node::DataItem]) -> () {}
+
+    fn visit_restore(&mut self, line_number: Option<u32>) -> () {
+        if let Some(line_number) = line_number {
+            let to_node = self.program.lookup_line(line_number);
+            if to_node.is_none() {
+                self.errors
+                    .push(format!("RESTORE undefined line {}", line_number));
+            }
+
+            // Check that the line number is a DATA statement
+            if let Some(to_node) = to_node {
+                if let Statement::Data { .. } = to_node {
+                    // Ok
+                } else {
+                    self.errors.push(format!(
+                        "RESTORE to non-DATA statement at line {}",
+                        line_number
+                    ));
+                }
+            }
+        }
+    }
 }
 
 impl<'a> ProgramVisitor<'a> for SemanticChecker<'a> {

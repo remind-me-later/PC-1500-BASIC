@@ -60,7 +60,7 @@ impl std::fmt::Display for UnaryOperator {
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Expression {
-    NumberLiteral(i32),
+    Number(i32),
     StringLiteral(String),
     Variable(String),
     Unary {
@@ -78,12 +78,18 @@ impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::StringLiteral(content) => write!(f, "\"{}\"", content),
-            Expression::NumberLiteral(value) => write!(f, "{}", value),
+            Expression::Number(value) => write!(f, "{}", value),
             Expression::Variable(variable) => write!(f, "{}", variable),
             Expression::Unary { op, operand } => write!(f, "{}{}", op, operand),
             Expression::Binary { left, op, right } => write!(f, "{} {} {}", left, op, right),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DataItem {
+    Number(i32),
+    String(String),
 }
 
 #[derive(Debug)]
@@ -101,6 +107,15 @@ pub enum Statement {
     Input {
         prompt: Option<Expression>,
         variable: String,
+    },
+    Data {
+        values: Vec<DataItem>,
+    },
+    Read {
+        variables: Vec<String>,
+    },
+    Restore {
+        line_number: Option<u32>,
     },
     Wait {
         time: Option<Expression>,

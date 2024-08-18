@@ -36,6 +36,9 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
     | <return>
     | <end>
     | <comment>
+    | <data>
+    | <read>
+    | <restore>
 
 <comment> ::= "REM" <char>*
 
@@ -47,6 +50,12 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <pause> ::= "PAUSE" <expression> (";" <expression>)*
 <input> ::= "INPUT" (<expression> ";")? <variable>
 <wait> ::= "WAIT" <expression>?
+
+/* Data */
+<data_item> ::= <number> | <string>
+<data> ::= "DATA" <data_item> ("," <data_item>)*
+<read> ::= "READ" <variable> ("," <variable>)*
+<restore> ::= "RESTORE" (<number>)?
 
 /* Control flow */
 <if> ::= "IF" <expression> "THEN" <statement> ("ELSE" <statement>)?

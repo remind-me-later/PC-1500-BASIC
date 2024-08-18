@@ -1,4 +1,7 @@
-use super::{node::UnaryOperator, BinaryOperator, Expression, Program, Statement};
+use super::{
+    node::{DataItem, UnaryOperator},
+    BinaryOperator, Expression, Program, Statement,
+};
 
 pub trait ExpressionVisitor<'a, RetTy = ()> {
     fn visit_number_literal(&mut self, num: i32) -> RetTy;
@@ -16,7 +19,7 @@ pub trait ExpressionVisitor<'a, RetTy = ()> {
 impl<'a> Expression {
     pub fn accept<V: ExpressionVisitor<'a, RetTy>, RetTy>(&'a self, visitor: &mut V) -> RetTy {
         match self {
-            Expression::NumberLiteral(num) => visitor.visit_number_literal(*num),
+            Expression::Number(num) => visitor.visit_number_literal(*num),
             Expression::StringLiteral(content) => visitor.visit_string_literal(content),
             Expression::Variable(variable) => visitor.visit_variable(variable),
             Expression::Unary { op, operand } => visitor.visit_unary_op(*op, operand),
@@ -30,6 +33,9 @@ pub trait StatementVisitor<'a, RetTy = ()> {
     fn visit_print(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_pause(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) -> RetTy;
+    fn visit_read(&mut self, variables: &'a [String]) -> RetTy;
+    fn visit_data(&mut self, values: &'a [DataItem]) -> RetTy;
+    fn visit_restore(&mut self, line_number: Option<u32>) -> RetTy;
     fn visit_wait(&mut self, time: Option<&'a Expression>) -> RetTy;
     fn visit_goto(&mut self, line_number: u32) -> RetTy;
     fn visit_for(
@@ -64,6 +70,9 @@ impl<'a> Statement {
             Statement::Pause { content } => visitor.visit_pause(content.as_slice()),
             Statement::Input { prompt, variable } => visitor.visit_input(prompt.as_ref(), variable),
             Statement::Wait { time } => visitor.visit_wait(time.as_ref()),
+            Statement::Data { values } => visitor.visit_data(values.as_slice()),
+            Statement::Read { variables } => visitor.visit_read(variables.as_slice()),
+            Statement::Restore { line_number } => visitor.visit_restore(*line_number),
             Statement::Goto { line_number } => visitor.visit_goto(*line_number),
             Statement::For {
                 variable,

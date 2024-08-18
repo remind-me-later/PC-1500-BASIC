@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use super::{
-    node::UnaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor, Statement,
-    StatementVisitor,
+    node::{DataItem, UnaryOperator},
+    Expression, ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor,
 };
 
 pub struct Printer<'a> {
@@ -174,6 +174,36 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
 
     fn visit_rem(&mut self, content: &'a str) {
         self.output.push_str(format!("REM {}", content).as_str());
+    }
+
+    fn visit_read(&mut self, variables: &'a [String]) -> () {
+        self.output.push_str("READ ");
+        for (i, variable) in variables.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.output.push_str(variable);
+        }
+    }
+
+    fn visit_data(&mut self, values: &'a [DataItem]) -> () {
+        self.output.push_str("DATA ");
+        for (i, value) in values.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            match value {
+                DataItem::Number(num) => self.output.push_str(&num.to_string()),
+                DataItem::String(string) => self.output.push_str(string),
+            }
+        }
+    }
+
+    fn visit_restore(&mut self, line_number: Option<u32>) -> () {
+        self.output.push_str("RESTORE ");
+        if let Some(line_number) = line_number {
+            self.output.push_str(&line_number.to_string());
+        }
     }
 }
 
