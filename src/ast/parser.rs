@@ -331,6 +331,23 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn pause(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let mut content = Vec::new();
+
+        while let Some(expr) = self.expression()? {
+            content.push(expr);
+
+            if self.current_token == Some(Token::Semicolon) {
+                self.current_token = self.lexer.next();
+            } else {
+                break;
+            }
+        }
+
+        Ok(Statement::Pause { content })
+    }
+
     fn print(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let mut content = Vec::new();
@@ -570,6 +587,7 @@ impl<'a> Parser<'a> {
         match self.current_token {
             Some(Token::Let | Token::Identifier(_)) => self.let_(),
             Some(Token::Print) => self.print(),
+            Some(Token::Pause) => self.pause(),
             Some(Token::Input) => self.input(),
             Some(Token::Goto) => self.goto(),
             Some(Token::For) => self.for_(),

@@ -88,6 +88,16 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
+    fn visit_pause(&mut self, content: &'a [Expression]) {
+        self.output.push_str("PAUSE ");
+        for (i, item) in content.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str("; ");
+            }
+            item.accept(self);
+        }
+    }
+
     fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) {
         self.output.push_str("INPUT ");
         if let Some(prompt) = prompt {

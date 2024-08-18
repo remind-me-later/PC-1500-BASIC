@@ -147,6 +147,12 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         }
     }
 
+    fn visit_pause(&mut self, content: &'a [Expression]) {
+        for item in content {
+            item.accept(self);
+        }
+    }
+
     fn visit_input(&mut self, _: Option<&'a Expression>, _: &'a str) {
         // TODO: check prompt is string? Are integer prompts allowed?
     }

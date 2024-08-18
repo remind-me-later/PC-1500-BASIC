@@ -1,7 +1,7 @@
 #[forbid(unsafe_code)]
 mod ast;
-mod cfg;
-mod tac;
+// mod cfg;
+// mod tac;
 
 use std::fs;
 
@@ -114,23 +114,23 @@ fn main() {
             }
         }
 
-        let (tac, literals) = tac::Builder::new(&program).build();
+        // let (tac, literals) = tac::Builder::new(&program).build();
 
-        if pass == Pass::Tac {
-            print!("string literals: ");
-            for literal in literals {
-                print!("{} ", literal);
-            }
-            println!();
+        // if pass == Pass::Tac {
+        //     print!("string literals: ");
+        //     for literal in literals {
+        //         print!("{} ", literal);
+        //     }
+        //     println!();
 
-            println!("start:\n{}", tac);
-            return;
-        }
+        //     println!("start:\n{}", tac);
+        //     return;
+        // }
 
-        if pass == Pass::Cfg {
-            let cfg = cfg::Builder::new(tac).build();
-            println!("{}", cfg);
-            return;
-        }
+        // if pass == Pass::Cfg {
+        //     let cfg = cfg::Builder::new(tac).build();
+        //     println!("{}", cfg);
+        //     return;
+        // }
     }
 }

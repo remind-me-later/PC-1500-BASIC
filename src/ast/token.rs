@@ -24,6 +24,7 @@ pub enum Token {
     // Intrinsics, might as well be keywords
     Print,
     Input,
+    Pause,
     // Comments, kind of a keyword
     Rem(String),
 
@@ -64,6 +65,7 @@ impl std::fmt::Display for Token {
             // Intrinsics
             Token::Print => write!(f, "PRINT"),
             Token::Input => write!(f, "INPUT"),
+            Token::Pause => write!(f, "PAUSE"),
             // Comments
             Token::Rem(content) => write!(f, "REM({})", content),
             // Operators

@@ -95,6 +95,9 @@ pub enum Statement {
     Print {
         content: Vec<Expression>,
     },
+    Pause {
+        content: Vec<Expression>,
+    },
     Input {
         prompt: Option<Expression>,
         variable: String,
