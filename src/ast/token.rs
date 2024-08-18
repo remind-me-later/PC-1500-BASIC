@@ -77,7 +77,6 @@ impl std::fmt::Display for Token {
             Token::Step => write!(f, "STEP"),
             Token::Then => write!(f, "THEN"),
             Token::To => write!(f, "TO"),
-            Token::Dim => write!(f, "DIM"),
             // Intrinsics
             Token::Data => write!(f, "DATA"),
             Token::Input => write!(f, "INPUT"),

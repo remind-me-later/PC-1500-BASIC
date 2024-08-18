@@ -1,12 +1,12 @@
 use super::{
-    node::{DataItem, UnaryOperator},
+    node::{DataItem, LValue, UnaryOperator},
     BinaryOperator, Expression, Program, Statement,
 };
 
 pub trait ExpressionVisitor<'a, RetTy = ()> {
     fn visit_number_literal(&mut self, num: i32) -> RetTy;
     fn visit_string_literal(&mut self, content: &'a str) -> RetTy;
-    fn visit_variable(&mut self, variable: &'a str) -> RetTy;
+    fn visit_variable(&mut self, lvalue: &'a LValue) -> RetTy;
     fn visit_unary_op(&mut self, op: UnaryOperator, operand: &'a Expression) -> RetTy;
     fn visit_binary_op(
         &mut self,
@@ -20,8 +20,8 @@ impl<'a> Expression {
     pub fn accept<V: ExpressionVisitor<'a, RetTy>, RetTy>(&'a self, visitor: &mut V) -> RetTy {
         match self {
             Expression::Number(num) => visitor.visit_number_literal(*num),
-            Expression::StringLiteral(content) => visitor.visit_string_literal(content),
-            Expression::Variable(variable) => visitor.visit_variable(variable),
+            Expression::String(content) => visitor.visit_string_literal(content),
+            Expression::LValue(variable) => visitor.visit_variable(variable),
             Expression::Unary { op, operand } => visitor.visit_unary_op(*op, operand),
             Expression::Binary { left, op, right } => visitor.visit_binary_op(left, *op, right),
         }
@@ -29,12 +29,12 @@ impl<'a> Expression {
 }
 
 pub trait StatementVisitor<'a, RetTy = ()> {
-    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression) -> RetTy;
+    fn visit_let(&mut self, variable: &'a LValue, expression: &'a Expression) -> RetTy;
     fn visit_print(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_pause(&mut self, content: &'a [Expression]) -> RetTy;
-    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) -> RetTy;
+    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a LValue) -> RetTy;
     fn visit_wait(&mut self, time: Option<&'a Expression>) -> RetTy;
-    fn visit_read(&mut self, variables: &'a [String]) -> RetTy;
+    fn visit_read(&mut self, variables: &'a [LValue]) -> RetTy;
     fn visit_data(&mut self, values: &'a [DataItem]) -> RetTy;
     fn visit_restore(&mut self, line_number: Option<u32>) -> RetTy;
     fn visit_poke(&mut self, address: u32, values: &'a [u8]) -> RetTy;

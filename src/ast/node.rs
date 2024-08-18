@@ -59,10 +59,28 @@ impl std::fmt::Display for UnaryOperator {
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub enum LValue {
+    Variable(String),
+    ArrayElement {
+        variable: String,
+        index: Box<Expression>,
+    },
+}
+
+impl std::fmt::Display for LValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LValue::Variable(variable) => write!(f, "{}", variable),
+            LValue::ArrayElement { variable, index } => write!(f, "{}({})", variable, index),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Expression {
     Number(i32),
-    StringLiteral(String),
-    Variable(String),
+    String(String),
+    LValue(LValue),
     Unary {
         op: UnaryOperator,
         operand: Box<Expression>,
@@ -77,9 +95,9 @@ pub enum Expression {
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::StringLiteral(content) => write!(f, "\"{}\"", content),
+            Expression::String(content) => write!(f, "\"{}\"", content),
             Expression::Number(value) => write!(f, "{}", value),
-            Expression::Variable(variable) => write!(f, "{}", variable),
+            Expression::LValue(variable) => write!(f, "{}", variable),
             Expression::Unary { op, operand } => write!(f, "{}{}", op, operand),
             Expression::Binary { left, op, right } => write!(f, "{} {} {}", left, op, right),
         }
@@ -95,7 +113,7 @@ pub enum DataItem {
 #[derive(Debug)]
 pub enum Statement {
     Let {
-        variable: String,
+        variable: LValue,
         expression: Expression,
     },
     Dim {
@@ -111,7 +129,7 @@ pub enum Statement {
     },
     Input {
         prompt: Option<Expression>,
-        variable: String,
+        variable: LValue,
     },
     Wait {
         time: Option<Expression>,
@@ -120,7 +138,7 @@ pub enum Statement {
         values: Vec<DataItem>,
     },
     Read {
-        variables: Vec<String>,
+        variables: Vec<LValue>,
     },
     Restore {
         line_number: Option<u32>,

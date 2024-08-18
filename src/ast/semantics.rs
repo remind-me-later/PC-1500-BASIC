@@ -1,6 +1,7 @@
 use super::{
-    node::UnaryOperator, BinaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor,
-    Statement, StatementVisitor,
+    node::{LValue, UnaryOperator},
+    BinaryOperator, Expression, ExpressionVisitor, Program, ProgramVisitor, Statement,
+    StatementVisitor,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +45,12 @@ impl<'a> SemanticChecker<'a> {
         }
     }
 
-    fn get_ty(&self, name: &'a str) -> Ty {
+    fn get_ty(&self, name: &'a LValue) -> Ty {
+        let name = match name {
+            LValue::Variable(name) => name,
+            LValue::ArrayElement { variable, .. } => variable,
+        };
+
         if name.ends_with("$") {
             Ty::String
         } else {
@@ -54,7 +60,7 @@ impl<'a> SemanticChecker<'a> {
 }
 
 impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
-    fn visit_variable(&mut self, name: &'a str) -> Ty {
+    fn visit_variable(&mut self, name: &'a LValue) -> Ty {
         self.get_ty(name)
     }
 
@@ -130,7 +136,7 @@ impl<'a> ExpressionVisitor<'a, Ty> for SemanticChecker<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression) {
+    fn visit_let(&mut self, variable: &'a LValue, expression: &'a Expression) {
         let expr_ty = expression.accept(self);
         let expected_ty = self.get_ty(variable);
         if expr_ty != expected_ty {
@@ -153,7 +159,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         }
     }
 
-    fn visit_input(&mut self, _: Option<&'a Expression>, _: &'a str) {
+    fn visit_input(&mut self, _: Option<&'a Expression>, _: &'a LValue) {
         // TODO: check prompt is string? Are integer prompts allowed?
     }
 
@@ -176,7 +182,11 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         to: &'a Expression,
         step: Option<&'a Expression>,
     ) {
-        let var_ty = self.get_ty(variable);
+        let var_ty = if variable.ends_with("$") {
+            Ty::String
+        } else {
+            Ty::Int
+        };
 
         if var_ty != Ty::Int {
             self.errors
@@ -201,7 +211,12 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     }
 
     fn visit_next(&mut self, variable: &'a str) {
-        let var_ty = self.get_ty(variable);
+        let var_ty = if variable.ends_with("$") {
+            Ty::String
+        } else {
+            Ty::Int
+        };
+
         if var_ty != Ty::Int {
             self.errors
                 .push("Loop variable must be an integer".to_owned());
@@ -258,7 +273,7 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
 
     fn visit_rem(&mut self, _: &'a str) {}
 
-    fn visit_read(&mut self, _variables: &'a [String]) -> () {
+    fn visit_read(&mut self, _variables: &'a [LValue]) -> () {
         // TODO: is it possible to check types of read variables? Probably not
     }
 
@@ -296,7 +311,11 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
     }
 
     fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) -> () {
-        let var_ty = self.get_ty(variable);
+        let var_ty = if variable.ends_with("$") {
+            Ty::String
+        } else {
+            Ty::Int
+        };
 
         if size > 255 {
             self.errors

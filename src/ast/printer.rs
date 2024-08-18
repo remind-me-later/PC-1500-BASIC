@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    node::{DataItem, UnaryOperator},
+    node::{DataItem, LValue, UnaryOperator},
     Expression, ExpressionVisitor, Program, ProgramVisitor, Statement, StatementVisitor,
 };
 
@@ -30,8 +30,8 @@ impl<'a> ExpressionVisitor<'a> for Printer<'a> {
         self.output.push_str(&num.to_string());
     }
 
-    fn visit_variable(&mut self, variable: &'a str) {
-        self.output.push_str(variable);
+    fn visit_variable(&mut self, variable: &'a LValue) {
+        self.output.push_str(variable.to_string().as_str());
     }
 
     fn visit_unary_op(&mut self, op: UnaryOperator, operand: &'a Expression) {
@@ -62,9 +62,9 @@ impl<'a> ExpressionVisitor<'a> for Printer<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for Printer<'a> {
-    fn visit_let(&mut self, variable: &'a str, expression: &'a Expression) {
+    fn visit_let(&mut self, variable: &'a LValue, expression: &'a Expression) {
         self.output.push_str("LET ");
-        self.output.push_str(variable);
+        self.output.push_str(variable.to_string().as_str());
         self.output.push_str(" = ");
         expression.accept(self);
     }
@@ -89,13 +89,13 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
-    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) {
+    fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a LValue) {
         self.output.push_str("INPUT ");
         if let Some(prompt) = prompt {
             prompt.accept(self);
             self.output.push_str("; ");
         }
-        self.output.push_str(variable);
+        self.output.push_str(variable.to_string().as_str());
     }
 
     fn visit_wait(&mut self, time: Option<&'a Expression>) {
@@ -176,13 +176,13 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         self.output.push_str(format!("REM {}", content).as_str());
     }
 
-    fn visit_read(&mut self, variables: &'a [String]) -> () {
+    fn visit_read(&mut self, variables: &'a [LValue]) -> () {
         self.output.push_str("READ ");
         for (i, variable) in variables.iter().enumerate() {
             if i > 0 {
                 self.output.push_str(", ");
             }
-            self.output.push_str(variable);
+            self.output.push_str(variable.to_string().as_str());
         }
     }
 

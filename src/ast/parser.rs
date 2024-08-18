@@ -1,7 +1,7 @@
 use std::mem;
 
 use super::error::ErrorKind;
-use super::node::{DataItem, UnaryOperator};
+use super::node::{DataItem, LValue, UnaryOperator};
 use super::{BinaryOperator, Error, Expression, Program, Statement};
 use super::{Lexer, Token};
 
@@ -22,19 +22,49 @@ impl<'a> Parser<'a> {
         self.program()
     }
 
+    fn lvalue(&mut self) -> Result<LValue, Error> {
+        match mem::take(&mut self.current_token) {
+            Some(Token::Identifier(v)) => {
+                self.current_token = self.lexer.next();
+
+                if self.current_token == Some(Token::LeftParen) {
+                    self.current_token = self.lexer.next();
+                    let index = self.expression()?;
+                    if self.current_token == Some(Token::RightParen) {
+                        self.current_token = self.lexer.next();
+                        Ok(LValue::ArrayElement {
+                            variable: v,
+                            index: Box::new(index.unwrap()),
+                        })
+                    } else {
+                        Err(Error {
+                            kind: ErrorKind::MismatchedParentheses,
+                            line: self.lexer.current_line(),
+                        })
+                    }
+                } else {
+                    Ok(LValue::Variable(v))
+                }
+            }
+            _ => Err(Error {
+                kind: ErrorKind::ExpectedIdentifier,
+                line: self.lexer.current_line(),
+            }),
+        }
+    }
+
     fn term(&mut self) -> Result<Option<Expression>, Error> {
         match mem::take(&mut self.current_token) {
             Some(Token::Number(n)) => {
                 self.current_token = self.lexer.next();
                 Ok(Some(Expression::Number(n)))
             }
-            Some(Token::Identifier(v)) => {
-                self.current_token = self.lexer.next();
-                Ok(Some(Expression::Variable(v)))
+            Some(Token::Identifier(_)) => {
+                self.lvalue().map(|lvalue| Some(Expression::LValue(lvalue)))
             }
             Some(Token::String(s)) => {
                 self.current_token = self.lexer.next();
-                Ok(Some(Expression::StringLiteral(s)))
+                Ok(Some(Expression::String(s)))
             }
             Some(Token::LeftParen) => {
                 self.current_token = self.lexer.next();
@@ -290,8 +320,8 @@ impl<'a> Parser<'a> {
             Some(Token::Let) => {
                 self.current_token = self.lexer.next();
 
-                match mem::take(&mut self.current_token) {
-                    Some(Token::Identifier(v)) => v,
+                match self.current_token {
+                    Some(Token::Identifier(_)) => self.lvalue()?,
                     _ => {
                         return Err(Error {
                             kind: ErrorKind::ExpectedIdentifier,
@@ -300,7 +330,7 @@ impl<'a> Parser<'a> {
                     }
                 }
             }
-            Some(Token::Identifier(v)) => v,
+            Some(Token::Identifier(_)) => self.lvalue()?,
             _ => {
                 unreachable!("We already checked for LET or identifier");
             }
@@ -373,8 +403,8 @@ impl<'a> Parser<'a> {
             self.current_token = self.lexer.next();
         }
 
-        let variable = match mem::take(&mut self.current_token) {
-            Some(Token::Identifier(v)) => v,
+        let variable = match self.current_token {
+            Some(Token::Identifier(_)) => self.lvalue()?,
             _ => {
                 return Err(Error {
                     kind: ErrorKind::ExpectedIdentifier,
@@ -432,9 +462,9 @@ impl<'a> Parser<'a> {
         let mut variables = Vec::new();
 
         loop {
-            match mem::take(&mut self.current_token) {
-                Some(Token::Identifier(v)) => {
-                    variables.push(v);
+            match self.current_token {
+                Some(Token::Identifier(_)) => {
+                    variables.push(self.lvalue()?);
                     self.current_token = self.lexer.next();
                 }
                 _ => {
