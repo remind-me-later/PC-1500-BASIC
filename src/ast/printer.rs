@@ -6,7 +6,6 @@ use super::{
 };
 
 pub struct Printer<'a> {
-    indent: usize,
     output: String,
     _phantom: PhantomData<&'a ()>,
 }
@@ -14,7 +13,6 @@ pub struct Printer<'a> {
 impl<'a> Printer<'a> {
     pub fn new() -> Self {
         Printer {
-            indent: 0,
             output: String::new(),
             _phantom: PhantomData,
         }
@@ -24,13 +22,6 @@ impl<'a> Printer<'a> {
         let mut visitor = Printer::new();
         ast.accept(&mut visitor);
         visitor.output
-    }
-
-    fn indent(&mut self) {
-        self.output.push('\t');
-        for _ in 0..self.indent {
-            self.output.push('\t');
-        }
     }
 }
 
@@ -107,6 +98,13 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         self.output.push_str(variable);
     }
 
+    fn visit_wait(&mut self, time: Option<&'a Expression>) {
+        self.output.push_str("WAIT ");
+        if let Some(time) = time {
+            time.accept(self);
+        }
+    }
+
     fn visit_goto(&mut self, line_number: u32) {
         self.output.push_str("GOTO ");
         self.output.push_str(&line_number.to_string());
@@ -129,17 +127,9 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
             self.output.push_str(" STEP ");
             step.accept(self);
         }
-        self.indent += 1;
     }
 
     fn visit_next(&mut self, variable: &'a str) {
-        self.indent -= 1;
-
-        // TODO: should be ok
-        if self.output.ends_with('\t') {
-            self.output.pop();
-        }
-
         self.output.push_str("NEXT ");
         self.output.push_str(variable);
     }
@@ -190,13 +180,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
 impl<'a> ProgramVisitor<'a> for Printer<'a> {
     fn visit_program(&mut self, program: &'a Program) {
         for (line_number, ast) in program.iter() {
-            // print line number and then indent
-            // 10 LET a = 1
-            // 20 FOR i = 1 TO 10
-            // 30     PRINT i
-            // 40     NEXT i
             self.output.push_str(&line_number.to_string());
-            self.indent();
 
             ast.accept(self);
             self.output.push('\n');

@@ -27,6 +27,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
     | <print>
     | <pause>
     | <input>
+    | <wait>
     | <if>
     | <for>
     | <next>
@@ -45,6 +46,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <print> ::= "PRINT" <expression> (";" <expression>)*
 <pause> ::= "PAUSE" <expression> (";" <expression>)*
 <input> ::= "INPUT" (<expression> ";")? <variable>
+<wait> ::= "WAIT" <expression>?
 
 /* Control flow */
 <if> ::= "IF" <expression> "THEN" <statement> ("ELSE" <statement>)?

@@ -157,6 +157,10 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         // TODO: check prompt is string? Are integer prompts allowed?
     }
 
+    fn visit_wait(&mut self, _: Option<&'a Expression>) {
+        // TODO: check time is in range? If possible
+    }
+
     fn visit_goto(&mut self, line_number: u32) {
         let to_node = self.program.lookup_line(line_number);
         if to_node.is_none() {

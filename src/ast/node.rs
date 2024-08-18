@@ -102,6 +102,9 @@ pub enum Statement {
         prompt: Option<Expression>,
         variable: String,
     },
+    Wait {
+        time: Option<Expression>,
+    },
     For {
         variable: String,
         from: Expression,

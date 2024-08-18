@@ -25,6 +25,7 @@ pub enum Token {
     Print,
     Input,
     Pause,
+    Wait,
     // Comments, kind of a keyword
     Rem(String),
 
@@ -66,6 +67,7 @@ impl std::fmt::Display for Token {
             Token::Print => write!(f, "PRINT"),
             Token::Input => write!(f, "INPUT"),
             Token::Pause => write!(f, "PAUSE"),
+            Token::Wait => write!(f, "WAIT"),
             // Comments
             Token::Rem(content) => write!(f, "REM({})", content),
             // Operators

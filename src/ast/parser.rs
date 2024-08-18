@@ -388,6 +388,13 @@ impl<'a> Parser<'a> {
         Ok(Statement::Input { prompt, variable })
     }
 
+    fn wait(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let time = self.expression()?;
+
+        Ok(Statement::Wait { time })
+    }
+
     fn goto(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
@@ -589,6 +596,7 @@ impl<'a> Parser<'a> {
             Some(Token::Print) => self.print(),
             Some(Token::Pause) => self.pause(),
             Some(Token::Input) => self.input(),
+            Some(Token::Wait) => self.wait(),
             Some(Token::Goto) => self.goto(),
             Some(Token::For) => self.for_(),
             Some(Token::Next) => self.next(),

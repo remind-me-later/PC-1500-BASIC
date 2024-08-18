@@ -111,6 +111,7 @@ impl<'a> Lexer<'a> {
                 "NOT" => Some(Token::Not),
                 "REM" => Some(self.comment()),
                 "PAUSE" => Some(Token::Pause),
+                "WAIT" => Some(Token::Wait),
                 _ => None,
             };
 

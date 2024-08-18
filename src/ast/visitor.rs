@@ -30,6 +30,7 @@ pub trait StatementVisitor<'a, RetTy = ()> {
     fn visit_print(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_pause(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) -> RetTy;
+    fn visit_wait(&mut self, time: Option<&'a Expression>) -> RetTy;
     fn visit_goto(&mut self, line_number: u32) -> RetTy;
     fn visit_for(
         &mut self,
@@ -62,6 +63,7 @@ impl<'a> Statement {
             Statement::Print { content } => visitor.visit_print(content.as_slice()),
             Statement::Pause { content } => visitor.visit_pause(content.as_slice()),
             Statement::Input { prompt, variable } => visitor.visit_input(prompt.as_ref(), variable),
+            Statement::Wait { time } => visitor.visit_wait(time.as_ref()),
             Statement::Goto { line_number } => visitor.visit_goto(*line_number),
             Statement::For {
                 variable,
