@@ -222,6 +222,19 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         self.output.push_str("CALL ");
         self.output.push_str(&address.to_string());
     }
+
+    fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) -> () {
+        self.output.push_str("DIM ");
+        self.output.push_str(variable);
+        self.output.push('(');
+        self.output.push_str(&size.to_string());
+        self.output.push(')');
+
+        if let Some(length) = length {
+            self.output.push_str(" * ");
+            self.output.push_str(&length.to_string());
+        }
+    }
 }
 
 impl<'a> ProgramVisitor<'a> for Printer<'a> {

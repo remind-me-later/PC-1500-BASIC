@@ -59,11 +59,17 @@ pub trait StatementVisitor<'a, RetTy = ()> {
     ) -> RetTy;
     fn visit_seq(&mut self, statements: &'a [Statement]) -> RetTy;
     fn visit_rem(&mut self, content: &'a str) -> RetTy;
+    fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) -> RetTy;
 }
 
 impl<'a> Statement {
     pub fn accept<V: StatementVisitor<'a, RetTy>, RetTy>(&'a self, visitor: &mut V) -> RetTy {
         match self {
+            Statement::Dim {
+                variable,
+                size,
+                length,
+            } => visitor.visit_dim(variable, *size, *length),
             Statement::Let {
                 variable,
                 expression,

@@ -98,6 +98,11 @@ pub enum Statement {
         variable: String,
         expression: Expression,
     },
+    Dim {
+        variable: String,
+        size: u32,
+        length: Option<u32>, // Only for strings
+    },
     Print {
         content: Vec<Expression>,
     },

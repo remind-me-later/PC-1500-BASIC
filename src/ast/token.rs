@@ -17,6 +17,7 @@ pub enum Token {
     To,
     Step,
     Next,
+    Dim,
     // kinda operator but treated as keyword
     And,
     Or,
@@ -61,6 +62,7 @@ impl std::fmt::Display for Token {
         match self {
             // Keywords
             Token::And => write!(f, "AND"),
+            Token::Dim => write!(f, "DIM"),
             Token::Else => write!(f, "ELSE"),
             Token::End => write!(f, "END"),
             Token::For => write!(f, "FOR"),

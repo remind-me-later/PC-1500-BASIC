@@ -41,22 +41,27 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
     | <restore>
     | <poke>
     | <call>
+    | <dim>
 
+/* Comments */
 <comment> ::= "REM" <char>*
 
-<assignment> ::= "LET"? <variable> "=" <expression>
+/* Variables */
 <variable> ::= <identifier> "$"?
+<array_subscript> ::= <variable> "(" <expression> ")"
+<lvalue> ::= <variable> | <array_subscript>
+<assignment> ::= "LET"? <lvalue> "=" <expression>
 
 /* I/O */
 <print> ::= "PRINT" <expression> (";" <expression>)*
 <pause> ::= "PAUSE" <expression> (";" <expression>)*
-<input> ::= "INPUT" (<expression> ";")? <variable>
+<input> ::= "INPUT" (<expression> ";")? <lvalue>
 <wait> ::= "WAIT" <expression>?
 
 /* Data */
 <data_item> ::= <number> | <string>
 <data> ::= "DATA" <data_item> ("," <data_item>)*
-<read> ::= "READ" <variable> ("," <variable>)*
+<read> ::= "READ" <lvalue> ("," <lvalue>)*
 <restore> ::= "RESTORE" (<number>)?
 
 /* Control flow */
@@ -72,6 +77,9 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <poke> ::= "POKE" <number>, (<number>)+
 <call> ::= "CALL" <number>
 
+/* Arrays */
+<dim> ::= "DIM" <variable> "(" <number> ")" ("*" <number>)?
+
 /* Expressions */
 <expression> ::= <or_expr>
 <or_expr> ::= <and_expr> ("OR" <and_expr>)*
@@ -81,5 +89,5 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <add_sub> ::= <mul_div> (<add_sub_op> <mul_div>)*
 <mul_div> ::= <factor> (<mul_div_op> <factor>)*
 <factor> ::= "-" <factor> | "+" <factor> | <term>
-<term> ::= <number> | <variable> | <string> | "(" <expression> ")"
+<term> ::= <number> | <lvalue> | <string> | "(" <expression> ")"
 ```

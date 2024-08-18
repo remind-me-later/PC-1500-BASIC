@@ -575,7 +575,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::Goto { line_number })
     }
 
-    fn parse_gosub(&mut self) -> Result<Statement, Error> {
+    fn gosub(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
             Some(Token::Number(n)) => match u32::try_from(*n) {
@@ -745,6 +745,87 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn dim(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let variable = match mem::take(&mut self.current_token) {
+            Some(Token::Identifier(v)) => v,
+            _ => {
+                return Err(Error {
+                    kind: ErrorKind::ExpectedIdentifier,
+                    line: self.lexer.current_line(),
+                });
+            }
+        };
+
+        self.current_token = self.lexer.next();
+        if self.current_token != Some(Token::LeftParen) {
+            return Err(Error {
+                kind: ErrorKind::ExpectedLeftParen,
+                line: self.lexer.current_line(),
+            });
+        }
+
+        self.current_token = self.lexer.next();
+        let size = match &self.current_token {
+            Some(Token::Number(n)) => match u32::try_from(*n) {
+                Ok(n) => n,
+                Err(_) => {
+                    return Err(Error {
+                        kind: ErrorKind::ExpectedUnsigned,
+                        line: self.lexer.current_line(),
+                    });
+                }
+            },
+            _ => {
+                return Err(Error {
+                    kind: ErrorKind::ExpectedUnsigned,
+                    line: self.lexer.current_line(),
+                });
+            }
+        };
+
+        if self.current_token != Some(Token::RightParen) {
+            return Err(Error {
+                kind: ErrorKind::ExpectedRightParen,
+                line: self.lexer.current_line(),
+            });
+        }
+
+        self.current_token = self.lexer.next();
+
+        let length = if self.current_token == Some(Token::Star) {
+            self.current_token = self.lexer.next();
+            match &self.current_token {
+                Some(Token::Number(n)) => match u32::try_from(*n) {
+                    Ok(n) => {
+                        self.current_token = self.lexer.next();
+                        Some(n)
+                    }
+                    Err(_) => {
+                        return Err(Error {
+                            kind: ErrorKind::ExpectedUnsigned,
+                            line: self.lexer.current_line(),
+                        });
+                    }
+                },
+                _ => {
+                    return Err(Error {
+                        kind: ErrorKind::ExpectedUnsigned,
+                        line: self.lexer.current_line(),
+                    });
+                }
+            }
+        } else {
+            None
+        };
+
+        Ok(Statement::Dim {
+            variable,
+            size,
+            length,
+        })
+    }
+
     fn atomic_statement(&mut self) -> Result<Statement, Error> {
         match self.current_token {
             Some(Token::Let | Token::Identifier(_)) => self.let_(),
@@ -756,7 +837,7 @@ impl<'a> Parser<'a> {
             Some(Token::For) => self.for_(),
             Some(Token::Next) => self.next(),
             Some(Token::End) => self.end(),
-            Some(Token::Gosub) => self.parse_gosub(),
+            Some(Token::Gosub) => self.gosub(),
             Some(Token::If) => self.if_(),
             Some(Token::Return) => self.return_(),
             Some(Token::Data) => self.data(),
@@ -764,6 +845,7 @@ impl<'a> Parser<'a> {
             Some(Token::Restore) => self.restore(),
             Some(Token::Poke) => self.poke(),
             Some(Token::Call) => self.call(),
+            Some(Token::Dim) => self.dim(),
             Some(Token::Rem(_)) => self.comment(),
             _ => Err(Error {
                 kind: ErrorKind::ExpectedStatement,

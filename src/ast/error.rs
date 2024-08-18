@@ -4,7 +4,9 @@ pub enum ErrorKind {
     ExpectedEndOfLine,
     ExpectedExpression,
     ExpectedIdentifier,
+    ExpectedLeftParen,
     ExpectedLineNumber,
+    ExpectedRightParen,
     ExpectedStatement,
     ExpectedUnsigned,
     MismatchedParentheses,
@@ -29,6 +31,8 @@ impl std::fmt::Display for Error {
             ErrorKind::ExpectedUnsigned => write!(f, "Expected unsigned number"),
             ErrorKind::MismatchedParentheses => write!(f, "Mismatched parentheses"),
             ErrorKind::UnexpectedToken => write!(f, "Unexpected token"),
+            ErrorKind::ExpectedLeftParen => write!(f, "Expected '('"),
+            ErrorKind::ExpectedRightParen => write!(f, "Expected ')'"),
         }
     }
 }
