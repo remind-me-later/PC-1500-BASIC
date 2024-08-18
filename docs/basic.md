@@ -25,6 +25,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <statement> ::= <atomic_statement> (":" <atomic_statement>)*
 <atomic_statement> ::= <assignment> 
     | <print>
+    | <pause>
     | <input>
     | <if>
     | <for>
@@ -42,6 +43,7 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 
 /* I/O */
 <print> ::= "PRINT" <expression> (";" <expression>)*
+<pause> ::= "PAUSE" <expression> (";" <expression>)*
 <input> ::= "INPUT" (<expression> ";")? <variable>
 
 /* Control flow */
