@@ -39,6 +39,8 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
     | <data>
     | <read>
     | <restore>
+    | <poke>
+    | <call>
 
 <comment> ::= "REM" <char>*
 
@@ -65,6 +67,10 @@ Checked with [BNF Visualizer](https://bnfplayground.pauliankline.com/).
 <gosub> ::= "GOSUB" <number>
 <return> ::= "RETURN"
 <end> ::= "END"
+
+/* Assembly */
+<poke> ::= "POKE" <number>, (<number>)+
+<call> ::= "CALL" <number>
 
 /* Expressions */
 <expression> ::= <or_expr>

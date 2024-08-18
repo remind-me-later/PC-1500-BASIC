@@ -30,6 +30,9 @@ pub enum Token {
     Data,
     Read,
     Restore,
+    // Inline assembly
+    Poke,
+    Call,
 
     // Comments, kind of a keyword
     Rem(String),
@@ -80,6 +83,8 @@ impl std::fmt::Display for Token {
             Token::Read => write!(f, "READ"),
             Token::Restore => write!(f, "RESTORE"),
             Token::Wait => write!(f, "WAIT"),
+            Token::Poke => write!(f, "POKE"),
+            Token::Call => write!(f, "CALL"),
             // Comments
             Token::Rem(content) => write!(f, "REM({})", content),
             // Operators

@@ -33,10 +33,12 @@ pub trait StatementVisitor<'a, RetTy = ()> {
     fn visit_print(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_pause(&mut self, content: &'a [Expression]) -> RetTy;
     fn visit_input(&mut self, prompt: Option<&'a Expression>, variable: &'a str) -> RetTy;
+    fn visit_wait(&mut self, time: Option<&'a Expression>) -> RetTy;
     fn visit_read(&mut self, variables: &'a [String]) -> RetTy;
     fn visit_data(&mut self, values: &'a [DataItem]) -> RetTy;
     fn visit_restore(&mut self, line_number: Option<u32>) -> RetTy;
-    fn visit_wait(&mut self, time: Option<&'a Expression>) -> RetTy;
+    fn visit_poke(&mut self, address: u32, values: &'a [u8]) -> RetTy;
+    fn visit_call(&mut self, address: u32) -> RetTy;
     fn visit_goto(&mut self, line_number: u32) -> RetTy;
     fn visit_for(
         &mut self,
@@ -73,6 +75,8 @@ impl<'a> Statement {
             Statement::Data { values } => visitor.visit_data(values.as_slice()),
             Statement::Read { variables } => visitor.visit_read(variables.as_slice()),
             Statement::Restore { line_number } => visitor.visit_restore(*line_number),
+            Statement::Poke { address, values } => visitor.visit_poke(*address, values.as_slice()),
+            Statement::Call { address } => visitor.visit_call(*address),
             Statement::Goto { line_number } => visitor.visit_goto(*line_number),
             Statement::For {
                 variable,

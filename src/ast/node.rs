@@ -108,6 +108,9 @@ pub enum Statement {
         prompt: Option<Expression>,
         variable: String,
     },
+    Wait {
+        time: Option<Expression>,
+    },
     Data {
         values: Vec<DataItem>,
     },
@@ -117,8 +120,12 @@ pub enum Statement {
     Restore {
         line_number: Option<u32>,
     },
-    Wait {
-        time: Option<Expression>,
+    Poke {
+        address: u32,
+        values: Vec<u8>,
+    },
+    Call {
+        address: u32,
     },
     For {
         variable: String,

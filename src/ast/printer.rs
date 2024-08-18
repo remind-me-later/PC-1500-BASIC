@@ -205,6 +205,23 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
             self.output.push_str(&line_number.to_string());
         }
     }
+
+    fn visit_poke(&mut self, address: u32, values: &'a [u8]) -> () {
+        self.output.push_str("POKE ");
+        self.output.push_str(&address.to_string());
+        self.output.push_str(", ");
+        for (i, value) in values.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.output.push_str(&value.to_string());
+        }
+    }
+
+    fn visit_call(&mut self, address: u32) -> () {
+        self.output.push_str("CALL ");
+        self.output.push_str(&address.to_string());
+    }
 }
 
 impl<'a> ProgramVisitor<'a> for Printer<'a> {

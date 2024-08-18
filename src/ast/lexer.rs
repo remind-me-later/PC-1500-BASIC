@@ -94,6 +94,7 @@ impl<'a> Lexer<'a> {
             // Greedily match a keyword
             let tok = match ident.as_str() {
                 "AND" => Some(Token::And),
+                "CALL" => Some(Token::Call),
                 "DATA" => Some(Token::Data),
                 "ELSE" => Some(Token::Else),
                 "END" => Some(Token::End),
@@ -107,6 +108,7 @@ impl<'a> Lexer<'a> {
                 "NOT" => Some(Token::Not),
                 "OR" => Some(Token::Or),
                 "PAUSE" => Some(Token::Pause),
+                "POKE" => Some(Token::Poke),
                 "PRINT" => Some(Token::Print),
                 "READ" => Some(Token::Read),
                 "REM" => Some(self.comment()),

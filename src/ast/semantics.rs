@@ -285,6 +285,15 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
             }
         }
     }
+
+    fn visit_poke(&mut self, _address: u32, _values: &'a [u8]) -> () {
+        // TODO: maybe check adress is in wirtable memory?
+        // Check that the literals fit in a byte is done in parsing
+    }
+
+    fn visit_call(&mut self, _address: u32) -> () {
+        // TODO: maybe check that there is a matching POKE to the address? Although this is not a strict requirement
+    }
 }
 
 impl<'a> ProgramVisitor<'a> for SemanticChecker<'a> {

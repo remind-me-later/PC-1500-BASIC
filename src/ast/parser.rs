@@ -477,6 +477,79 @@ impl<'a> Parser<'a> {
         Ok(Statement::Restore { line_number })
     }
 
+    fn poke(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let address = match &self.current_token {
+            Some(Token::Number(n)) => u32::try_from(*n).map_err(|_| Error {
+                kind: ErrorKind::ExpectedUnsigned,
+                line: self.lexer.current_line(),
+            })?,
+            _ => {
+                return Err(Error {
+                    kind: ErrorKind::ExpectedUnsigned,
+                    line: self.lexer.current_line(),
+                });
+            }
+        };
+
+        self.current_token = self.lexer.next();
+        if self.current_token != Some(Token::Comma) {
+            return Err(Error {
+                kind: ErrorKind::UnexpectedToken,
+                line: self.lexer.current_line(),
+            });
+        }
+
+        self.current_token = self.lexer.next();
+        let mut values: Vec<u8> = Vec::new();
+
+        loop {
+            match mem::take(&mut self.current_token) {
+                Some(Token::Number(n)) => {
+                    values.push(u8::try_from(n).map_err(|_| Error {
+                        kind: ErrorKind::ExpectedUnsigned,
+                        line: self.lexer.current_line(),
+                    })?);
+                    self.current_token = self.lexer.next();
+                }
+                _ => {
+                    return Err(Error {
+                        kind: ErrorKind::ExpectedUnsigned,
+                        line: self.lexer.current_line(),
+                    });
+                }
+            }
+
+            if self.current_token == Some(Token::Comma) {
+                self.current_token = self.lexer.next();
+            } else {
+                break;
+            }
+        }
+
+        Ok(Statement::Poke { address, values })
+    }
+
+    fn call(&mut self) -> Result<Statement, Error> {
+        self.current_token = self.lexer.next();
+        let address = match &self.current_token {
+            Some(Token::Number(n)) => u32::try_from(*n).map_err(|_| Error {
+                kind: ErrorKind::ExpectedUnsigned,
+                line: self.lexer.current_line(),
+            })?,
+            _ => {
+                return Err(Error {
+                    kind: ErrorKind::ExpectedUnsigned,
+                    line: self.lexer.current_line(),
+                });
+            }
+        };
+
+        self.current_token = self.lexer.next();
+
+        Ok(Statement::Call { address })
+    }
+
     fn goto(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let line_number = match &self.current_token {
@@ -689,6 +762,8 @@ impl<'a> Parser<'a> {
             Some(Token::Data) => self.data(),
             Some(Token::Read) => self.read(),
             Some(Token::Restore) => self.restore(),
+            Some(Token::Poke) => self.poke(),
+            Some(Token::Call) => self.call(),
             Some(Token::Rem(_)) => self.comment(),
             _ => Err(Error {
                 kind: ErrorKind::ExpectedStatement,
