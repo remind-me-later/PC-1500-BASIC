@@ -1,18 +1,19 @@
-use std::iter::FusedIterator;
+use std::{
+    iter::{FusedIterator, Peekable},
+    str::Chars,
+};
 
 use super::Token;
 
 pub struct Lexer<'a> {
-    input: &'a str,
-    position: usize,
+    input: Peekable<Chars<'a>>,
     current_line: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Self {
-            input,
-            position: 0,
+            input: input.chars().peekable(),
             current_line: 0,
         }
     }
@@ -24,83 +25,46 @@ impl<'a> Lexer<'a> {
     fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
-        if self.position >= self.input.len() {
-            return None;
-        }
-
-        let token = match self.input.chars().nth(self.position) {
-            Some(c) if c.is_ascii_alphabetic() => self.identifier(),
-            Some(c) if c.is_ascii_digit() => self
-                .number()
+        let token = match self.input.next()? {
+            c if c.is_ascii_alphabetic() => self.identifier(c),
+            c if c.is_ascii_digit() => self
+                .number(c)
                 .unwrap_or_else(|_| panic!("Invalid number at line {}", self.current_line)),
-            Some('"') => self
+            '"' => self
                 .string()
                 .unwrap_or_else(|_| panic!("Unterminated string at line {}", self.current_line)),
-            Some('+') => {
-                self.position += 1;
-                Token::Plus
-            }
-            Some('-') => {
-                self.position += 1;
-                Token::Minus
-            }
-            Some('*') => {
-                self.position += 1;
-                Token::Star
-            }
-            Some('/') => {
-                self.position += 1;
-                Token::Slash
-            }
-            Some('<') => {
-                if self.input.chars().nth(self.position + 1) == Some('>') {
-                    self.position += 2;
+            '+' => Token::Plus,
+            '-' => Token::Minus,
+            '*' => Token::Star,
+            '/' => Token::Slash,
+            '<' => {
+                if self.input.next_if_eq(&'>').is_some() {
                     Token::Diamond
-                } else if self.input.chars().nth(self.position + 1) == Some('=') {
-                    self.position += 2;
+                } else if self.input.next_if_eq(&'=').is_some() {
                     Token::LessOrEqual
                 } else {
-                    self.position += 1;
                     Token::LessThan
                 }
             }
-            Some('>') => {
-                if self.input.chars().nth(self.position + 1) == Some('=') {
-                    self.position += 2;
+            '>' => {
+                if self.input.next_if_eq(&'=').is_some() {
                     Token::GreaterOrEqual
                 } else {
-                    self.position += 1;
                     Token::GreaterThan
                 }
             }
-            Some('=') => {
-                self.position += 1;
-                Token::Equal
-            }
-            Some(';') => {
-                self.position += 1;
-                Token::Semicolon
-            }
-            Some(':') => {
-                self.position += 1;
-                Token::Colon
-            }
-            Some('(') => {
-                self.position += 1;
-                Token::LeftParen
-            }
-            Some(')') => {
-                self.position += 1;
-                Token::RightParen
-            }
-            Some('\n' | '\r') => {
+            '=' => Token::Equal,
+            ';' => Token::Semicolon,
+            ':' => Token::Colon,
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
+            '\n' | '\r' => {
                 self.skip_newline();
                 Token::Newline
             }
-            _ => panic!(
+            other => panic!(
                 "Unexpected character '{}' at line {}",
-                self.input.chars().nth(self.position).unwrap(),
-                self.current_line
+                other, self.current_line
             ),
         };
 
@@ -108,42 +72,23 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while self.position < self.input.len() {
-            match self.input.chars().nth(self.position) {
-                Some(' ' | '\t') => self.position += 1,
-                _ => break,
-            }
-        }
+        while self.input.next_if(|&c| matches!(c, ' ' | '\t')).is_some() {}
     }
 
     // We already know the first character is a whitespace before entering this function
     fn skip_newline(&mut self) {
-        while self.position < self.input.len() {
-            self.skip_whitespace();
-            match self.input.chars().nth(self.position) {
-                Some('\n' | '\r') => {
-                    self.current_line += 1;
-                    self.position += 1;
-                }
-                _ => break,
-            }
+        while self.input.next_if(|&c| matches!(c, '\n' | '\r')).is_some() {
+            self.current_line += 1;
         }
     }
 
     // We already know the first character is an alphabetic character before entering this function
-    fn identifier(&mut self) -> Token {
+    fn identifier(&mut self, first: char) -> Token {
         let mut ident = String::new();
-        ident.push(self.input.chars().nth(self.position).unwrap());
+        ident.push(first);
 
-        for char in self.input.get(self.position + 1..).unwrap().chars() {
-            if char.is_ascii_alphabetic() {
-                ident.push(char);
-            } else if char == '$' {
-                ident.push(char);
-                break;
-            } else {
-                break;
-            }
+        while let Some(c) = self.input.next_if(|&c| c.is_ascii_alphabetic()) {
+            ident.push(c);
 
             // Greedily match a keyword
             let tok = match ident.as_str() {
@@ -169,71 +114,50 @@ impl<'a> Lexer<'a> {
             };
 
             if tok.is_some() {
-                self.position += ident.len();
                 return tok.unwrap();
             }
         }
 
-        self.position += ident.len();
+        let last = self.input.peek().copied();
+        if let Some('$') = last {
+            ident.push('$');
+            self.input.next();
+        }
 
         Token::Identifier(ident.to_owned())
     }
 
     // We already know the first character is a digit before entering this function
-    fn number(&mut self) -> Result<Token, ()> {
-        let mut len = 1;
-        let chars = self.input.get(self.position + 1..).unwrap().chars();
+    fn number(&mut self, first: char) -> Result<Token, ()> {
+        let mut chars = String::new();
+        chars.push(first);
+        self.input
+            .by_ref()
+            .take_while(|&c| c.is_ascii_digit())
+            .for_each(|c| chars.push(c));
 
-        for char in chars {
-            if char.is_ascii_digit() {
-                len += 1;
-            } else {
-                break;
-            }
-        }
-
-        let num = self.input.get(self.position..self.position + len).unwrap();
-        self.position += len;
-
-        Ok(Token::Number(num.parse().map_err(|_e| ())?))
+        Ok(Token::Number(chars.parse().map_err(|_e| ())?))
     }
 
     // We already know the first character is a double quote before entering this function
     fn string(&mut self) -> Result<Token, ()> {
-        let mut len = 1;
-        let chars = self.input.get(self.position + 1..).unwrap().chars();
-
-        for char in chars {
-            if char == '"' || char == '\n' || char == '\r' {
-                len += 1;
-                break;
-            } else {
-                len += 1;
-            }
-        }
-
-        let string = self
+        let chars: String = self
             .input
-            .get(self.position + 1..self.position + len - 1)
-            .unwrap();
-        self.position += len;
-        Ok(Token::String(string.to_owned()))
+            .by_ref()
+            .take_while(|&c| c != '"' && c != '\n' && c != '\r')
+            .collect();
+
+        self.input.next(); // Consume the closing double quote, or newline
+
+        Ok(Token::String(chars.to_owned()))
     }
 
     fn comment(&mut self) -> Token {
-        let mut len = 0;
-        let chars = self.input.get(self.position..).unwrap().chars();
-
-        for char in chars {
-            if char == '\n' || char == '\r' {
-                break;
-            } else {
-                len += 1;
-            }
-        }
-
-        let s = self.input.get(self.position..self.position + len).unwrap();
-        self.position += len;
+        let s: String = self
+            .input
+            .by_ref()
+            .take_while(|&c| c != '\n' && c != '\r')
+            .collect();
 
         Token::Rem(s.trim().to_owned())
     }
@@ -247,7 +171,7 @@ impl Iterator for Lexer<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.input.get(self.position..).unwrap().len()))
+        self.input.size_hint()
     }
 }
 
