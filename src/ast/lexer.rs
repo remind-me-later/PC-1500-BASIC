@@ -96,6 +96,7 @@ impl<'a> Lexer<'a> {
                 "AND" => Some(Token::And),
                 "CALL" => Some(Token::Call),
                 "DATA" => Some(Token::Data),
+                "DIM" => Some(Token::Dim),
                 "ELSE" => Some(Token::Else),
                 "END" => Some(Token::End),
                 "FOR" => Some(Token::For),
