@@ -122,8 +122,8 @@ impl<'a> Lexer<'a> {
                 _ => None,
             };
 
-            if tok.is_some() {
-                return tok.unwrap();
+            if let Some(tok) = tok {
+                return tok;
             }
         }
 

@@ -273,13 +273,13 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
 
     fn visit_rem(&mut self, _: &'a str) {}
 
-    fn visit_read(&mut self, _variables: &'a [LValue]) -> () {
+    fn visit_read(&mut self, _variables: &'a [LValue]) {
         // TODO: is it possible to check types of read variables? Probably not
     }
 
-    fn visit_data(&mut self, _values: &'a [super::node::DataItem]) -> () {}
+    fn visit_data(&mut self, _values: &'a [super::node::DataItem]) {}
 
-    fn visit_restore(&mut self, line_number: Option<u32>) -> () {
+    fn visit_restore(&mut self, line_number: Option<u32>) {
         if let Some(line_number) = line_number {
             let to_node = self.program.lookup_line(line_number);
             if to_node.is_none() {
@@ -301,16 +301,16 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
         }
     }
 
-    fn visit_poke(&mut self, _address: u32, _values: &'a [u8]) -> () {
+    fn visit_poke(&mut self, _address: u32, _values: &'a [u8]) {
         // TODO: maybe check adress is in wirtable memory?
         // Check that the literals fit in a byte is done in parsing
     }
 
-    fn visit_call(&mut self, _address: u32) -> () {
+    fn visit_call(&mut self, _address: u32) {
         // TODO: maybe check that there is a matching POKE to the address? Although this is not a strict requirement
     }
 
-    fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) -> () {
+    fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) {
         let var_ty = if variable.ends_with("$") {
             Ty::String
         } else {
@@ -322,15 +322,13 @@ impl<'a> StatementVisitor<'a> for SemanticChecker<'a> {
                 .push("Array size must be between 0 and 255".to_owned());
         }
 
-        if var_ty == Ty::Int {
-            if length.is_some() {
-                self.errors
-                    .push("INT variables cannot have length".to_owned());
-            }
+        if var_ty == Ty::Int && length.is_some() {
+            self.errors
+                .push("INT variables cannot have length".to_owned());
         }
 
         if let Some(length) = length {
-            if length < 1 || length > 80 {
+            if !(1..=80).contains(&length) {
                 self.errors
                     .push("String length must be between 1 and 80".to_owned());
             }

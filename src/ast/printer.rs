@@ -176,7 +176,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         self.output.push_str(format!("REM {}", content).as_str());
     }
 
-    fn visit_read(&mut self, variables: &'a [LValue]) -> () {
+    fn visit_read(&mut self, variables: &'a [LValue]) {
         self.output.push_str("READ ");
         for (i, variable) in variables.iter().enumerate() {
             if i > 0 {
@@ -186,7 +186,7 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
-    fn visit_data(&mut self, values: &'a [DataItem]) -> () {
+    fn visit_data(&mut self, values: &'a [DataItem]) {
         self.output.push_str("DATA ");
         for (i, value) in values.iter().enumerate() {
             if i > 0 {
@@ -199,14 +199,14 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
-    fn visit_restore(&mut self, line_number: Option<u32>) -> () {
+    fn visit_restore(&mut self, line_number: Option<u32>) {
         self.output.push_str("RESTORE ");
         if let Some(line_number) = line_number {
             self.output.push_str(&line_number.to_string());
         }
     }
 
-    fn visit_poke(&mut self, address: u32, values: &'a [u8]) -> () {
+    fn visit_poke(&mut self, address: u32, values: &'a [u8]) {
         self.output.push_str("POKE ");
         self.output.push_str(&address.to_string());
         self.output.push_str(", ");
@@ -218,12 +218,12 @@ impl<'a> StatementVisitor<'a> for Printer<'a> {
         }
     }
 
-    fn visit_call(&mut self, address: u32) -> () {
+    fn visit_call(&mut self, address: u32) {
         self.output.push_str("CALL ");
         self.output.push_str(&address.to_string());
     }
 
-    fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) -> () {
+    fn visit_dim(&mut self, variable: &'a str, size: u32, length: Option<u32>) {
         self.output.push_str("DIM ");
         self.output.push_str(variable);
         self.output.push('(');

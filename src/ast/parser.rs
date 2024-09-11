@@ -510,7 +510,7 @@ impl<'a> Parser<'a> {
     fn poke(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let address = match &self.current_token {
-            Some(Token::Number(n)) => u32::try_from(*n).map_err(|_| Error {
+            Some(Token::Number(n)) => u32::try_from(*n).map_err(|_e| Error {
                 kind: ErrorKind::ExpectedUnsigned,
                 line: self.lexer.current_line(),
             })?,
@@ -536,7 +536,7 @@ impl<'a> Parser<'a> {
         loop {
             match mem::take(&mut self.current_token) {
                 Some(Token::Number(n)) => {
-                    values.push(u8::try_from(n).map_err(|_| Error {
+                    values.push(u8::try_from(n).map_err(|_e| Error {
                         kind: ErrorKind::ExpectedUnsigned,
                         line: self.lexer.current_line(),
                     })?);
@@ -563,7 +563,7 @@ impl<'a> Parser<'a> {
     fn call(&mut self) -> Result<Statement, Error> {
         self.current_token = self.lexer.next();
         let address = match &self.current_token {
-            Some(Token::Number(n)) => u32::try_from(*n).map_err(|_| Error {
+            Some(Token::Number(n)) => u32::try_from(*n).map_err(|_e| Error {
                 kind: ErrorKind::ExpectedUnsigned,
                 line: self.lexer.current_line(),
             })?,
@@ -656,7 +656,8 @@ impl<'a> Parser<'a> {
 
         let else_ = if self.current_token == Some(Token::Else) {
             self.current_token = self.lexer.next();
-            Some(Box::new(self.statement()?))
+            let statement = self.statement()?;
+            Some(Box::new(statement))
         } else {
             None
         };
