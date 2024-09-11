@@ -85,9 +85,9 @@ fn main() {
         }
     } else {
         if pass == Pass::Parse {
-            let printer = ast::Printer::new();
-            let output = printer.build(&program);
-            println!("{}", output);
+            // let printer = ast::Printer::new();
+            // let output = printer.build(&program);
+            println!("{program:?}");
             return;
         }
 

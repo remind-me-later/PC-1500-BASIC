@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     // Parse errors
     ExpectedDataItem,
@@ -13,6 +14,7 @@ pub enum ErrorKind {
     UnexpectedToken,
 }
 
+#[derive(Debug)]
 pub struct Error {
     pub kind: ErrorKind,
     pub line: usize,
@@ -36,3 +38,5 @@ impl std::fmt::Display for Error {
         }
     }
 }
+
+impl std::error::Error for Error {}
