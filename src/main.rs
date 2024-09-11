@@ -1,7 +1,5 @@
 #[forbid(unsafe_code)]
 mod ast;
-// mod cfg;
-// mod tac;
 
 use std::fs;
 
@@ -12,13 +10,12 @@ enum Pass {
     Lex,
     Parse,
     Sem,
-    Tac,
-    Cfg,
+    C,
 }
 
 impl clap::ValueEnum for Pass {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Pass::Lex, Pass::Parse, Pass::Sem, Pass::Tac, Pass::Cfg]
+        &[Pass::Lex, Pass::Parse, Pass::Sem, Pass::C]
     }
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
@@ -26,8 +23,7 @@ impl clap::ValueEnum for Pass {
             Pass::Lex => Some(clap::builder::PossibleValue::new("lex")),
             Pass::Parse => Some(clap::builder::PossibleValue::new("parse")),
             Pass::Sem => Some(clap::builder::PossibleValue::new("sem")),
-            Pass::Tac => Some(clap::builder::PossibleValue::new("tac")),
-            Pass::Cfg => Some(clap::builder::PossibleValue::new("cfg")),
+            Pass::C => Some(clap::builder::PossibleValue::new("c")),
         }
     }
 }
@@ -114,23 +110,6 @@ fn main() {
             }
         }
 
-        // let (tac, literals) = tac::Builder::new(&program).build();
-
-        // if pass == Pass::Tac {
-        //     print!("string literals: ");
-        //     for literal in literals {
-        //         print!("{} ", literal);
-        //     }
-        //     println!();
-
-        //     println!("start:\n{}", tac);
-        //     return;
-        // }
-
-        // if pass == Pass::Cfg {
-        //     let cfg = cfg::Builder::new(tac).build();
-        //     println!("{}", cfg);
-        //     return;
-        // }
+        todo!("Generate C code");
     }
 }
