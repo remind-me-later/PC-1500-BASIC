@@ -940,7 +940,7 @@ mod expression {
         use super::*;
 
         #[test]
-        fn test_add_sub_1() -> Result<(), Error> {
+        fn test_add_sub_1() {
             let expected = Expression::Binary {
                 left: Box::new(Expression::Number(1)),
                 op: BinaryOperator::Add,
@@ -954,23 +954,17 @@ mod expression {
             let lexer = Lexer::new("1 + 2 - 3");
             let mut parser = ExpressionParser::new(lexer.peekable());
 
-            let res = parser.add_sub()?;
+            let res = parser
+                .add_sub()
+                .expect("Failed to parse expression")
+                .expect("Expected an expression");
 
-            if let Some(res) = res {
-                assert_eq!(res, expected, "Expected: {:?}, got: {:?}", expected, res);
-            } else {
-                return Err(Error {
-                    kind: ErrorKind::ExpectedExpression,
-                    line: 0,
-                });
-            }
-
-            Ok(())
+            assert_eq!(res, expected, "Expected: {:?}, got: {:?}", expected, res);
         }
 
         // FIXME: Check operator precedence
         #[test]
-        fn test_mul_div_1() -> Result<(), Error> {
+        fn test_mul_div_1() {
             let expected = Expression::Binary {
                 left: Box::new(Expression::Number(1)),
                 op: BinaryOperator::Mul,
@@ -984,32 +978,27 @@ mod expression {
             let lexer = Lexer::new("1 * 2 / 3");
             let mut parser = ExpressionParser::new(lexer.peekable());
 
-            let res = parser.mul_div()?;
+            let res = parser
+                .mul_div()
+                .expect("Failed to parse expression")
+                .expect("Expected an expression");
 
-            if let Some(res) = res {
-                assert_eq!(res, expected, "Expected: {:?}, got: {:?}", expected, res);
-            } else {
-                return Err(Error {
-                    kind: ErrorKind::ExpectedExpression,
-                    line: 0,
-                });
-            }
-
-            Ok(())
+            assert_eq!(
+                res, expected,
+                "Obtained AST does not match the expected one.",
+            );
         }
 
         #[test]
-        fn test_lvalue_1() -> Result<(), Error> {
+        fn test_lvalue_1() {
             let expected = LValue::Variable("A".to_owned());
 
             let lexer = Lexer::new("A");
             let mut parser = ExpressionParser::new(lexer.peekable());
 
-            let res = parser.lvalue()?;
+            let res = parser.lvalue().expect("Failed to parse lvalue");
 
             assert_eq!(res, expected, "Expected: {:?}, got: {:?}", expected, res);
-
-            Ok(())
         }
     }
 }
