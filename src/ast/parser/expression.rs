@@ -348,44 +348,44 @@ mod tests {
 
         assert_eq!(res, expected);
     }
-}
 
-// Parenthesized expression
-#[test]
-fn term_1() {
-    let expected = Expression::Binary {
-        left: Box::new(Expression::Number(42)),
-        op: BinaryOperator::Mul,
-        right: Box::new(Expression::Number(43)),
-    };
+    // Parenthesized expression
+    #[test]
+    fn term_1() {
+        let expected = Expression::Binary {
+            left: Box::new(Expression::Number(42)),
+            op: BinaryOperator::Mul,
+            right: Box::new(Expression::Number(43)),
+        };
 
-    let lexer = Lexer::new("(42 * 43)");
+        let lexer = Lexer::new("(42 * 43)");
 
-    let mut parser = ExpressionParser::new(lexer.peekable());
+        let mut parser = ExpressionParser::new(lexer.peekable());
 
-    let res = parser
-        .term()
-        .expect("Failed to parse expression")
-        .expect("Expected an expression");
+        let res = parser
+            .term()
+            .expect("Failed to parse expression")
+            .expect("Expected an expression");
 
-    assert_eq!(res, expected);
-}
+        assert_eq!(res, expected);
+    }
 
-#[test]
-fn comparison_eq() {
-    let expected = Expression::Binary {
-        left: Box::new(Expression::Number(42)),
-        op: BinaryOperator::Eq,
-        right: Box::new(Expression::Number(43)),
-    };
+    #[test]
+    fn comparison_eq() {
+        let expected = Expression::Binary {
+            left: Box::new(Expression::Number(42)),
+            op: BinaryOperator::Eq,
+            right: Box::new(Expression::Number(43)),
+        };
 
-    let lexer = Lexer::new("42 = 43");
-    let mut parser = ExpressionParser::new(lexer.peekable());
+        let lexer = Lexer::new("42 = 43");
+        let mut parser = ExpressionParser::new(lexer.peekable());
 
-    let res = parser
-        .comparison()
-        .expect("Failed to parse expression")
-        .expect("Expected an expression");
+        let res = parser
+            .comparison()
+            .expect("Failed to parse expression")
+            .expect("Expected an expression");
 
-    assert_eq!(res, expected);
+        assert_eq!(res, expected);
+    }
 }
