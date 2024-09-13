@@ -150,11 +150,12 @@ impl<'a> Lexer<'a> {
 
     // We already know the first character is a double quote before entering this function
     fn string(&mut self) -> Result<Token, ()> {
-        let chars: String = self
-            .input
-            .by_ref()
-            .take_while(|&c| c != '"' && c != '\n' && c != '\r')
-            .collect();
+        // 20 is just a heuristic
+        let mut chars = String::with_capacity(20);
+
+        while let Some(c) = self.input.next_if(|&c| c != '"' && c != '\n' && c != '\r') {
+            chars.push(c);
+        }
 
         self.input.next(); // Consume the closing double quote, or newline
 
@@ -254,6 +255,15 @@ mod tests {
         let input = "\"hello\"";
         let mut lexer = super::Lexer::new(input);
         assert_eq!(lexer.next(), Some(super::Token::String("hello".to_owned())));
+    }
+
+    #[test]
+    fn parenthesized_string() {
+        let input = "(\"hello\")";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::LeftParen));
+        assert_eq!(lexer.next(), Some(super::Token::String("hello".to_owned())));
+        assert_eq!(lexer.next(), Some(super::Token::RightParen));
     }
 
     #[test]
