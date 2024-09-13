@@ -1,9 +1,10 @@
+mod token;
+
 use std::{
     iter::{FusedIterator, Peekable},
     str::Chars,
 };
-
-use super::Token;
+pub use token::Token;
 
 pub struct Lexer<'a> {
     input: Peekable<Chars<'a>>,
@@ -177,6 +178,97 @@ impl Iterator for Lexer<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.input.size_hint()
+    }
 }
 
 impl FusedIterator for Lexer<'_> {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn number_basic() {
+        let input = "123";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+    }
+
+    #[test]
+    fn number_minus_unary() {
+        let input = "-123";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Minus));
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+    }
+
+    #[test]
+    fn number_minus_binary() {
+        let input = "123-456";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+        assert_eq!(lexer.next(), Some(super::Token::Minus));
+        assert_eq!(lexer.next(), Some(super::Token::Number(456)));
+    }
+
+    #[test]
+    fn number_plus_unary() {
+        let input = "+123";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Plus));
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+    }
+
+    #[test]
+    fn number_plus_binary() {
+        let input = "123+456";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+        assert_eq!(lexer.next(), Some(super::Token::Plus));
+        assert_eq!(lexer.next(), Some(super::Token::Number(456)));
+    }
+
+    #[test]
+    fn parentheses() {
+        let input = "(123)";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::LeftParen));
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+        assert_eq!(lexer.next(), Some(super::Token::RightParen));
+    }
+
+    #[test]
+    fn parentheses_binary() {
+        let input = "123+(456)";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Number(123)));
+        assert_eq!(lexer.next(), Some(super::Token::Plus));
+        assert_eq!(lexer.next(), Some(super::Token::LeftParen));
+        assert_eq!(lexer.next(), Some(super::Token::Number(456)));
+        assert_eq!(lexer.next(), Some(super::Token::RightParen));
+    }
+
+    #[test]
+    fn string_basic() {
+        let input = "\"hello\"";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::String("hello".to_owned())));
+    }
+
+    #[test]
+    fn comment_basic() {
+        let input = "REM hello";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Rem("hello".to_owned())));
+    }
+
+    #[test]
+    fn skip_empty_lines() {
+        let input = "REM hello\n\n\nREM world";
+        let mut lexer = super::Lexer::new(input);
+        assert_eq!(lexer.next(), Some(super::Token::Rem("hello".to_owned())));
+        assert_eq!(lexer.next(), Some(super::Token::Newline));
+        assert_eq!(lexer.next(), Some(super::Token::Rem("world".to_owned())));
+    }
+}

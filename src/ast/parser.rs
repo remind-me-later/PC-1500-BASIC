@@ -4,7 +4,7 @@ use std::mem;
 use super::error::ErrorKind;
 use super::node::{DataItem, LValue, UnaryOperator};
 use super::{BinaryOperator, Error, Expression, Program, Statement};
-use super::{Lexer, Token};
+use crate::tokens::{Lexer, Token};
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
@@ -701,9 +701,9 @@ impl<'a> Parser<'a> {
 
 mod expression {
     use crate::ast::{
-        error::ErrorKind, node::LValue, BinaryOperator, Error, Expression, Lexer, Token,
-        UnaryOperator,
+        error::ErrorKind, node::LValue, BinaryOperator, Error, Expression, UnaryOperator,
     };
+    use crate::tokens::{Lexer, Token};
     use std::{iter::Peekable, mem};
 
     pub struct ExpressionParser<'a> {
@@ -940,7 +940,7 @@ mod expression {
         use super::*;
 
         #[test]
-        fn test_add_sub_1() {
+        fn add_sub_1() {
             let expected = Expression::Binary {
                 left: Box::new(Expression::Binary {
                     left: Box::new(Expression::Number(1)),
@@ -964,7 +964,7 @@ mod expression {
 
         // FIXME: Check operator precedence
         #[test]
-        fn test_mul_div_1() {
+        fn mul_div_1() {
             let expected = Expression::Binary {
                 left: Box::new(Expression::Binary {
                     left: Box::new(Expression::Number(1)),
@@ -987,7 +987,7 @@ mod expression {
         }
 
         #[test]
-        fn test_lvalue_1() {
+        fn lvalue_1() {
             let expected = LValue::Variable("A".to_owned());
 
             let lexer = Lexer::new("A");
@@ -999,7 +999,7 @@ mod expression {
         }
 
         #[test]
-        fn test_factor_1() {
+        fn factor_1() {
             let expected = Expression::Number(42);
 
             let lexer = Lexer::new("42");
@@ -1015,7 +1015,7 @@ mod expression {
 
         // Unary +
         #[test]
-        fn test_factor_2() {
+        fn factor_2() {
             let expected = Expression::Unary {
                 op: UnaryOperator::Plus,
                 operand: Box::new(Expression::Number(42)),
@@ -1034,7 +1034,7 @@ mod expression {
 
         // Unary -
         #[test]
-        fn test_factor_3() {
+        fn factor_3() {
             let expected = Expression::Unary {
                 op: UnaryOperator::Minus,
                 operand: Box::new(Expression::Number(42)),
@@ -1054,7 +1054,7 @@ mod expression {
 
     // Parenthesized expression
     #[test]
-    fn test_term_1() {
+    fn term_1() {
         let expected = Expression::Binary {
             left: Box::new(Expression::Number(42)),
             op: BinaryOperator::Mul,
@@ -1074,7 +1074,7 @@ mod expression {
     }
 
     #[test]
-    fn test_comparison_eq() {
+    fn comparison_eq() {
         let expected = Expression::Binary {
             left: Box::new(Expression::Number(42)),
             op: BinaryOperator::Eq,

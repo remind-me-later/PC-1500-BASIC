@@ -1,5 +1,6 @@
 #[forbid(unsafe_code)]
 mod ast;
+mod tokens;
 
 use std::fs;
 
@@ -64,7 +65,7 @@ fn main() {
 
     let pass = *args.get_one::<Pass>("pass").unwrap();
 
-    let tokens = ast::Lexer::new(&input);
+    let tokens = tokens::Lexer::new(&input);
 
     if pass == Pass::Lex {
         for token in tokens {
