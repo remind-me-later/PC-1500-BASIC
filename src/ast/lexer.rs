@@ -26,10 +26,6 @@ impl<'a> Lexer<'a> {
         self.skip_whitespace();
 
         let token = match self.input.next()? {
-            c if c.is_ascii_alphabetic() => self.identifier(c),
-            c if c.is_ascii_digit() => self
-                .number(c)
-                .unwrap_or_else(|_| panic!("Invalid number at line {}", self.current_line)),
             '"' => self
                 .string()
                 .unwrap_or_else(|_| panic!("Unterminated string at line {}", self.current_line)),
@@ -63,6 +59,10 @@ impl<'a> Lexer<'a> {
                 self.skip_newline();
                 Token::Newline
             }
+            c if c.is_ascii_alphabetic() => self.identifier(c),
+            c if c.is_ascii_digit() => self
+                .number(c)
+                .unwrap_or_else(|_| panic!("Invalid number at line {}", self.current_line)),
             other => panic!(
                 "Unexpected character '{}' at line {}",
                 other, self.current_line
@@ -140,10 +140,9 @@ impl<'a> Lexer<'a> {
     fn number(&mut self, first: char) -> Result<Token, ()> {
         let mut chars = String::new();
         chars.push(first);
-        self.input
-            .by_ref()
-            .take_while(|&c| c.is_ascii_digit())
-            .for_each(|c| chars.push(c));
+        while let Some(c) = self.input.next_if(|&c| c.is_ascii_digit()) {
+            chars.push(c);
+        }
 
         Ok(Token::Number(chars.parse().map_err(|_e| ())?))
     }
@@ -177,10 +176,6 @@ impl Iterator for Lexer<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.input.size_hint()
     }
 }
 

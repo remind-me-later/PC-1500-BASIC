@@ -777,21 +777,21 @@ mod expression {
                 Some(Token::LeftParen) => {
                     self.lexer.next();
                     let res = self.parse()?;
-                    if self.lexer.peek() == Some(&Token::RightParen) {
-                        self.lexer.next();
-                        Ok(res)
-                    } else {
-                        Err(Error {
-                            kind: ErrorKind::MismatchedParentheses,
-                            line: 0, // TODO
-                        })
-                    }
+                    // if self.lexer.next() == Some(Token::RightParen) {
+                    //     Ok(res)
+                    // } else {
+                    //     Err(Error {
+                    //         kind: ErrorKind::MismatchedParentheses,
+                    //         line: 0, // TODO
+                    //     })
+                    // }
+                    Ok(res)
                 }
                 _ => Ok(None),
             }
         }
 
-        // // unary + and -
+        // unary + and -
         fn factor(&mut self) -> Result<Option<Expression>, Error> {
             // println!("factor");
             if self.lexer.peek() == Some(&Token::Plus) || self.lexer.peek() == Some(&Token::Minus) {
@@ -870,7 +870,7 @@ mod expression {
                     _ => unreachable!(),
                 };
 
-                let right = self.add_sub();
+                let right = self.mul_div();
                 let right = if let Some(right) = right? {
                     right
                 } else {
@@ -914,7 +914,7 @@ mod expression {
                     _ => unreachable!(),
                 };
 
-                let right = self.comparison();
+                let right = self.add_sub();
                 let right = if let Some(right) = right? {
                     right
                 } else {
@@ -942,13 +942,13 @@ mod expression {
         #[test]
         fn test_add_sub_1() {
             let expected = Expression::Binary {
-                left: Box::new(Expression::Number(1)),
-                op: BinaryOperator::Add,
-                right: Box::new(Expression::Binary {
-                    left: Box::new(Expression::Number(2)),
-                    op: BinaryOperator::Sub,
-                    right: Box::new(Expression::Number(3)),
+                left: Box::new(Expression::Binary {
+                    left: Box::new(Expression::Number(1)),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::Number(2)),
                 }),
+                op: BinaryOperator::Sub,
+                right: Box::new(Expression::Number(3)),
             };
 
             let lexer = Lexer::new("1 + 2 - 3");
@@ -959,20 +959,20 @@ mod expression {
                 .expect("Failed to parse expression")
                 .expect("Expected an expression");
 
-            assert_eq!(res, expected, "Expected: {:?}, got: {:?}", expected, res);
+            assert_eq!(res, expected);
         }
 
         // FIXME: Check operator precedence
         #[test]
         fn test_mul_div_1() {
             let expected = Expression::Binary {
-                left: Box::new(Expression::Number(1)),
-                op: BinaryOperator::Mul,
-                right: Box::new(Expression::Binary {
-                    left: Box::new(Expression::Number(2)),
-                    op: BinaryOperator::Div,
-                    right: Box::new(Expression::Number(3)),
+                left: Box::new(Expression::Binary {
+                    left: Box::new(Expression::Number(1)),
+                    op: BinaryOperator::Mul,
+                    right: Box::new(Expression::Number(2)),
                 }),
+                op: BinaryOperator::Div,
+                right: Box::new(Expression::Number(3)),
             };
 
             let lexer = Lexer::new("1 * 2 / 3");
@@ -983,10 +983,7 @@ mod expression {
                 .expect("Failed to parse expression")
                 .expect("Expected an expression");
 
-            assert_eq!(
-                res, expected,
-                "Obtained AST does not match the expected one.",
-            );
+            assert_eq!(res, expected);
         }
 
         #[test]
@@ -998,7 +995,100 @@ mod expression {
 
             let res = parser.lvalue().expect("Failed to parse lvalue");
 
-            assert_eq!(res, expected, "Expected: {:?}, got: {:?}", expected, res);
+            assert_eq!(res, expected);
         }
+
+        #[test]
+        fn test_factor_1() {
+            let expected = Expression::Number(42);
+
+            let lexer = Lexer::new("42");
+            let mut parser = ExpressionParser::new(lexer.peekable());
+
+            let res = parser
+                .factor()
+                .expect("Failed to parse expression")
+                .expect("Expected an expression");
+
+            assert_eq!(res, expected);
+        }
+
+        // Unary +
+        #[test]
+        fn test_factor_2() {
+            let expected = Expression::Unary {
+                op: UnaryOperator::Plus,
+                operand: Box::new(Expression::Number(42)),
+            };
+
+            let lexer = Lexer::new("+42");
+            let mut parser = ExpressionParser::new(lexer.peekable());
+
+            let res = parser
+                .factor()
+                .expect("Failed to parse expression")
+                .expect("Expected an expression");
+
+            assert_eq!(res, expected);
+        }
+
+        // Unary -
+        #[test]
+        fn test_factor_3() {
+            let expected = Expression::Unary {
+                op: UnaryOperator::Minus,
+                operand: Box::new(Expression::Number(42)),
+            };
+
+            let lexer = Lexer::new("-42");
+            let mut parser = ExpressionParser::new(lexer.peekable());
+
+            let res = parser
+                .factor()
+                .expect("Failed to parse expression")
+                .expect("Expected an expression");
+
+            assert_eq!(res, expected);
+        }
+    }
+
+    // Parenthesized expression
+    #[test]
+    fn test_term_1() {
+        let expected = Expression::Binary {
+            left: Box::new(Expression::Number(42)),
+            op: BinaryOperator::Mul,
+            right: Box::new(Expression::Number(43)),
+        };
+
+        let lexer = Lexer::new("(42 * 43)");
+
+        let mut parser = ExpressionParser::new(lexer.peekable());
+
+        let res = parser
+            .term()
+            .expect("Failed to parse expression")
+            .expect("Expected an expression");
+
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn test_comparison_eq() {
+        let expected = Expression::Binary {
+            left: Box::new(Expression::Number(42)),
+            op: BinaryOperator::Eq,
+            right: Box::new(Expression::Number(43)),
+        };
+
+        let lexer = Lexer::new("42 = 43");
+        let mut parser = ExpressionParser::new(lexer.peekable());
+
+        let res = parser
+            .comparison()
+            .expect("Failed to parse expression")
+            .expect("Expected an expression");
+
+        assert_eq!(res, expected);
     }
 }
