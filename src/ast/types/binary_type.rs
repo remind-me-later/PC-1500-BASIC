@@ -12,8 +12,8 @@ impl Binary {
         let mut bytes = [0; 8];
         let mut val = value;
         bytes[4] = 0xB2;
-        bytes[5] = val as u8;
-        bytes[6] = (val >> 8) as u8;
+        bytes[6] = val as u8;
+        bytes[5] = (val >> 8) as u8;
 
         Binary { bytes, value }
     }

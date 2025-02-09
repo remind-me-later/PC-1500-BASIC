@@ -16,8 +16,8 @@ impl String {
         let mut bytes = [0; 8];
         mem_dir = content.as_ptr() as usize as u16;
         bytes[4] = 0xD0;
-        bytes[5] = mem_dir as u8; // The memory address of the string is saved in bytes[5] and bytes[6], 16 bits of memory address
-        bytes[6] = (mem_dir >> 8) as u8;
+        bytes[6] = mem_dir as u8; // The memory address of the string is saved in bytes[5] and bytes[6], 16 bits of memory address
+        bytes[5] = (mem_dir >> 8) as u8;
         bytes[7] = value.len() as u8;
 
         fill_content(&value, &mut content);
